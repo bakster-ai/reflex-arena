@@ -1,0 +1,4468 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <meta name="theme-color" content="#0e0f13" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Reflex" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <link rel="icon" href="/icon-192.png" />
+  <title>Reflex Arena — 1v1 на реакцию</title>
+  <style>
+    :root {
+      --bg: #0e0f13;
+      --panel: #16181f;
+      --panel2: #1c1f28;
+      --border: #2a2e3a;
+      --text: #eaecef;
+      --muted: #8a93a6;
+      --accent: #ff7a29;
+      --accent2: #ffb86b;
+      --win: #26d67f;
+      --lose: #ff4d6d;
+      --warn: #ffc93c;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0; padding: 0;
+      height: 100%;
+      height: 100dvh;
+      width: 100%;
+      max-width: 100vw;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden;
+      overflow-x: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      overscroll-behavior: none;
+      touch-action: manipulation;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      position: fixed;
+      inset: 0;
+    }
+    button { -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+    input { font-size: 16px; /* защита от зума на iOS */ }
+    a { color: inherit; }
+    button { font-family: inherit; cursor: pointer; }
+
+    /* ── Top bar ── */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      height: 54px;
+      flex-shrink: 0;
+    }
+    .topbar .logo { font-weight: 800; font-size: 15px; letter-spacing: 0.3px; color: var(--accent); }
+    .topbar .right { display: flex; gap: 6px; align-items: center; font-size: 12px; flex-wrap: nowrap; }
+    @media (max-width: 480px) {
+      .topbar { padding: 8px 10px; height: 50px; }
+      .topbar .logo { font-size: 14px; }
+      .topbar .logo .logo-full { display: none; }  /* скрываем текст лого, оставляем значок */
+      .topbar .right { gap: 4px; }
+      #top-nick { display: none; }
+    }
+    .chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: var(--panel2); border: 1px solid var(--border);
+      padding: 4px 8px; border-radius: 20px; font-weight: 600;
+      font-size: 12px; white-space: nowrap;
+    }
+    .chip.coins { color: var(--accent2); }
+    .chip.elo { color: var(--win); }
+    .back-btn {
+      background: transparent; border: 1px solid var(--border); color: var(--text);
+      padding: 6px 12px; border-radius: 8px; font-size: 13px;
+    }
+    .back-btn:hover { background: var(--panel2); }
+
+    /* ── Container ── */
+    .app {
+      height: calc(100% - 54px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      width: 100%;
+      max-width: 100vw;
+      -webkit-overflow-scrolling: touch;
+    }
+    .screen { display: none; height: 100%; max-width: 100vw; overflow-x: hidden; }
+    .screen.active { display: block; }
+    #screen-match.active { display: flex; flex-direction: column; }
+    input[type="text"], input[type="password"], input[type="number"], .stake-custom { max-width: 100%; }
+
+    /* ── Lobby ── */
+    .lobby {
+      max-width: 720px; margin: 16px auto; padding: 0 12px;
+    }
+    .lobby h1 {
+      font-size: 28px; margin: 6px 0 4px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .lobby .sub { color: var(--muted); margin-bottom: 16px; font-size: 13px; }
+
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 14px; padding: 16px; margin-bottom: 12px;
+    }
+    .panel h3 { margin: 0 0 10px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+    @media (max-width: 480px) {
+      .lobby { padding: 0 10px; margin: 10px auto; }
+      .lobby h1 { font-size: 24px; }
+      .panel { padding: 14px; margin-bottom: 10px; border-radius: 12px; }
+    }
+
+    .stake-row {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    }
+    .stake-btn {
+      background: var(--panel2); border: 1.5px solid var(--border); color: var(--text);
+      padding: 14px 8px; border-radius: 10px; font-weight: 700; font-size: 15px;
+      transition: all 0.15s;
+      min-height: 48px;  /* touch-target */
+    }
+    @media (max-width: 380px) {
+      .stake-row { gap: 6px; }
+      .stake-btn { padding: 12px 4px; font-size: 13px; }
+    }
+    .stake-btn.selected {
+      background: rgba(255, 122, 41, 0.15); border-color: var(--accent); color: var(--accent2);
+    }
+    .stake-btn:hover:not(.selected) { background: #232833; }
+    .stake-custom {
+      width: 100%; background: var(--panel2); border: 1.5px solid var(--border);
+      color: var(--text); padding: 12px; border-radius: 10px; font-size: 14px;
+      margin-top: 8px;
+    }
+
+    .play-btn {
+      display: block; width: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      color: #1a1205; border: none;
+      padding: 18px; border-radius: 12px; font-size: 18px; font-weight: 800;
+      margin-top: 8px; transition: transform 0.1s, box-shadow 0.1s;
+      box-shadow: 0 6px 20px rgba(255, 122, 41, 0.35);
+    }
+    .play-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(255, 122, 41, 0.5); }
+    .play-btn:disabled { opacity: 0.5; transform: none; cursor: not-allowed; }
+
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .stat {
+      background: var(--panel2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px; text-align: center;
+    }
+    .stat .v { font-size: 22px; font-weight: 800; }
+    .stat .l { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-top: 2px; letter-spacing: 0.5px; }
+
+    .games-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .game-chip {
+      background: var(--panel2); border: 1px solid var(--border);
+      padding: 6px 12px; border-radius: 20px; font-size: 12px;
+    }
+
+    .history-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+    }
+    .history-item:last-child { border-bottom: none; }
+    .history-item .w { color: var(--win); font-weight: 700; }
+    .history-item .l { color: var(--lose); font-weight: 700; }
+
+    /* ── Leaderboard ── */
+    .lb-table { width: 100%; font-size: 13px; }
+    .lb-table th {
+      text-align: left; padding: 8px; color: var(--muted);
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+    .lb-table td { padding: 10px 8px; border-bottom: 1px solid var(--border); }
+    .lb-table tr:last-child td { border-bottom: none; }
+    .lb-rank { font-weight: 800; color: var(--accent); width: 40px; }
+
+    /* ── Queue ── */
+    .queue {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 80px 20px; text-align: center;
+    }
+    .queue .spinner {
+      width: 64px; height: 64px; border: 3px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 1s linear infinite; margin-bottom: 24px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .queue h2 { font-size: 22px; margin: 0 0 8px; }
+    .queue .wait-time { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+    .cancel-btn {
+      background: transparent; border: 1px solid var(--border); color: var(--text);
+      padding: 10px 20px; border-radius: 10px;
+    }
+
+    /* ── Match ── */
+    .match { height: 100%; display: flex; flex-direction: column; }
+    .match-header {
+      background: var(--panel); border-bottom: 1px solid var(--border);
+      padding: 10px 12px; display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px; flex-shrink: 0;
+    }
+    .player-box { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .player-box.right { justify-content: flex-end; }
+    .player-box .name { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }
+    .player-box .score {
+      font-size: 24px; font-weight: 800; min-width: 26px; text-align: center;
+    }
+    .player-box.right .name { order: 2; }
+    .player-box.right .score { order: 1; }
+
+    .round-info {
+      padding: 0 10px; text-align: center; font-size: 11px; color: var(--muted);
+      flex-shrink: 0;
+    }
+    @media (max-width: 480px) {
+      .match-header { padding: 8px 10px; }
+      .player-box .name { max-width: 70px; font-size: 12px; }
+      .player-box .score { font-size: 22px; }
+      #p1-elo, #p2-elo { display: none; }
+    }
+
+    .round-progress {
+      display: flex; gap: 4px; justify-content: center;
+      padding: 8px 0 12px;
+    }
+    .round-dot {
+      width: 24px; height: 6px; background: var(--panel2); border-radius: 3px;
+    }
+    .round-dot.p1-won { background: var(--accent); }
+    .round-dot.p2-won { background: var(--lose); }
+    .round-dot.tie { background: var(--warn); }
+    .round-dot.current {
+      background: var(--panel2); box-shadow: 0 0 0 2px var(--accent);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse { 50% { box-shadow: 0 0 0 4px rgba(255, 122, 41, 0.4); } }
+
+    .game-area {
+      flex: 1; position: relative; background: var(--panel2);
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+
+    .game-intro {
+      text-align: center;
+    }
+    .game-intro .game-name {
+      font-size: 32px; font-weight: 800; margin-bottom: 8px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .game-intro .game-desc { color: var(--muted); font-size: 15px; margin-bottom: 24px; max-width: 440px; padding: 0 20px; }
+    .countdown { font-size: 96px; font-weight: 800; color: var(--accent); }
+
+    /* React-game */
+    .react-area {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center;
+      cursor: crosshair;
+    }
+    .react-area.wait { background: #2a2319; }
+    .react-area.go { background: #165a37; }
+    .react-area.early { background: #5a1a1a; }
+    .react-area .big {
+      font-size: 44px; font-weight: 800;
+    }
+    .react-area .small { font-size: 14px; color: var(--muted); margin-top: 10px; }
+    .react-progress { margin-top: 20px; font-size: 13px; color: var(--muted); }
+    .react-attempts { margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent2); }
+
+    /* Aim-game */
+    .aim-area {
+      position: absolute; inset: 0;
+      background: #0c1f16;
+      cursor: crosshair;
+      overflow: hidden;
+    }
+    .aim-target {
+      position: absolute;
+      width: 60px; height: 60px;
+      background: radial-gradient(circle, #ff4d6d 0%, #a8243f 60%, #1a0a0f 100%);
+      border-radius: 50%;
+      cursor: crosshair;
+      transform: translate(-50%, -50%) scale(0);
+      animation: aim-pop 0.15s forwards;
+      box-shadow: 0 0 20px rgba(255, 77, 109, 0.6);
+    }
+    @keyframes aim-pop {
+      0% { transform: translate(-50%, -50%) scale(0); }
+      60% { transform: translate(-50%, -50%) scale(1.15); }
+      100% { transform: translate(-50%, -50%) scale(1); }
+    }
+    .aim-target.hit { animation: aim-hit 0.2s forwards; }
+    @keyframes aim-hit {
+      0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; }
+    }
+    .aim-hud {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.5); padding: 6px 16px; border-radius: 20px;
+      font-weight: 700; font-size: 14px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Sequence-game */
+    .seq-area {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #0f1418;
+    }
+    .seq-board {
+      display: grid; grid-template-columns: repeat(2, 120px); gap: 16px;
+      margin-bottom: 20px;
+    }
+    .seq-btn {
+      width: 120px; height: 120px; border-radius: 16px;
+      border: 3px solid var(--border);
+      transition: transform 0.1s, filter 0.1s;
+      cursor: pointer;
+    }
+    .seq-btn.red { background: #8a2a2a; }
+    .seq-btn.blue { background: #2a498a; }
+    .seq-btn.green { background: #2a8a4e; }
+    .seq-btn.yellow { background: #8a7a2a; }
+    .seq-btn.active.red { background: #ff4a4a; filter: brightness(1.5); }
+    .seq-btn.active.blue { background: #4a7dff; filter: brightness(1.5); }
+    .seq-btn.active.green { background: #4aff7a; filter: brightness(1.5); }
+    .seq-btn.active.yellow { background: #ffd94a; filter: brightness(1.5); }
+    .seq-btn:active:not(.disabled) { transform: scale(0.95); }
+    .seq-btn.disabled { cursor: not-allowed; opacity: 0.7; }
+    .seq-status { font-size: 18px; font-weight: 700; }
+    .seq-len { color: var(--accent); font-size: 22px; font-weight: 800; margin-top: 6px; }
+
+    /* Math-game */
+    .math-area {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #14171f;
+    }
+    .math-hud {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.5); padding: 6px 16px; border-radius: 20px;
+      font-weight: 700; font-size: 14px;
+      pointer-events: none;
+    }
+    .math-expr {
+      font-size: 72px; font-weight: 800; font-family: 'JetBrains Mono', monospace;
+      color: var(--accent2); margin-bottom: 32px;
+      letter-spacing: 2px;
+    }
+    .math-options { display: grid; grid-template-columns: repeat(2, 140px); gap: 14px; }
+    .math-opt {
+      padding: 22px 10px; font-size: 28px; font-weight: 800;
+      background: var(--panel); border: 2px solid var(--border);
+      color: var(--text); border-radius: 14px;
+      transition: transform 0.08s, background 0.1s;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .math-opt:hover { background: var(--panel2); border-color: var(--accent); }
+    .math-opt:active { transform: scale(0.95); }
+    .math-opt.correct { background: rgba(38, 214, 127, 0.3); border-color: var(--win); }
+    .math-opt.wrong { background: rgba(255, 77, 109, 0.3); border-color: var(--lose); }
+    .math-stats { margin-top: 20px; color: var(--muted); font-size: 13px; }
+
+    /* Odd-game (найди отличие) */
+    .odd-area {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #0f1418;
+    }
+    .odd-hud {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.5); padding: 6px 16px; border-radius: 20px;
+      font-weight: 700; font-size: 14px;
+      pointer-events: none;
+    }
+    .odd-grid {
+      display: grid; gap: 4px;
+      background: rgba(255,255,255,0.02); padding: 8px; border-radius: 8px;
+    }
+    .odd-cell {
+      border: none; cursor: pointer; border-radius: 4px;
+      transition: transform 0.08s;
+    }
+    .odd-cell:active { transform: scale(0.92); }
+    .odd-flash-wrong { animation: oddWrong 0.3s; }
+    @keyframes oddWrong {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-6px); }
+      75% { transform: translateX(6px); }
+    }
+
+    /* Typing-game */
+    .typ-area {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #161a22;
+      padding: 20px;
+    }
+    .typ-hud {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.5); padding: 6px 16px; border-radius: 20px;
+      font-weight: 700; font-size: 14px;
+      pointer-events: none;
+    }
+    .typ-word {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 52px; font-weight: 800;
+      letter-spacing: 2px; margin-bottom: 20px;
+      min-height: 64px;
+    }
+    .typ-word .done { color: var(--win); }
+    .typ-word .cur { color: var(--accent); text-decoration: underline; }
+    .typ-word .todo { color: var(--muted); }
+    .typ-input {
+      width: 80%; max-width: 360px;
+      padding: 14px 20px; font-size: 22px;
+      background: var(--panel); border: 2px solid var(--border);
+      color: var(--text); border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      text-align: center;
+    }
+    .typ-input:focus { outline: none; border-color: var(--accent); }
+    .typ-input.wrong { border-color: var(--lose); background: rgba(255,77,109,0.1); }
+
+    /* Stroop-game */
+    .stroop-area {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #11151a;
+      padding: 20px;
+    }
+    .stroop-hud {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.5); padding: 6px 16px; border-radius: 20px;
+      font-weight: 700; font-size: 14px;
+      pointer-events: none;
+    }
+    .stroop-word {
+      font-size: 76px; font-weight: 800; margin-bottom: 28px;
+      letter-spacing: 1px; text-shadow: 0 2px 12px rgba(0,0,0,0.6);
+    }
+    .stroop-opts { display: grid; grid-template-columns: repeat(2, 140px); gap: 12px; }
+    .stroop-opt {
+      padding: 18px 8px; font-size: 18px; font-weight: 800;
+      background: var(--panel); border: 2px solid var(--border);
+      color: var(--text); border-radius: 12px;
+      transition: transform 0.08s;
+    }
+    .stroop-opt:active { transform: scale(0.94); }
+    .stroop-opt.correct { background: rgba(38,214,127,0.25); border-color: var(--win); }
+    .stroop-opt.wrong { background: rgba(255,77,109,0.25); border-color: var(--lose); }
+
+    /* Memory (флип-карточки) */
+    .mem-area {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #0e1520;
+    }
+    .mem-hud {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.5); padding: 6px 16px; border-radius: 20px;
+      font-weight: 700; font-size: 14px; pointer-events: none;
+    }
+    .mem-grid {
+      display: grid; gap: 8px; padding: 10px;
+    }
+    .mem-card {
+      width: 72px; height: 72px; border-radius: 10px; cursor: pointer;
+      position: relative; perspective: 600px; background: transparent; border: none; padding: 0;
+    }
+    .mem-card-inner {
+      position: absolute; inset: 0; transform-style: preserve-3d;
+      transition: transform 0.4s;
+    }
+    .mem-card.flipped .mem-card-inner { transform: rotateY(180deg); }
+    .mem-card-face {
+      position: absolute; inset: 0; backface-visibility: hidden;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 10px; font-size: 32px; font-weight: 800;
+    }
+    .mem-face-back {
+      background: linear-gradient(135deg, #2c3e5e, #1a2338);
+      border: 2px solid #3a4a6e; color: #6a7a9e;
+    }
+    .mem-face-front {
+      background: #1a2b3d; border: 2px solid var(--accent);
+      transform: rotateY(180deg);
+    }
+    .mem-card.matched .mem-card-inner { opacity: 0.4; }
+    .mem-card.matched .mem-face-front { border-color: var(--win); }
+
+    /* Spatial Memory (паттерн точек) */
+    .sp-area {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #0a0f18;
+    }
+    .sp-hud {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.5); padding: 6px 16px; border-radius: 20px;
+      font-weight: 700; font-size: 14px; pointer-events: none;
+    }
+    .sp-status { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
+    .sp-grid { display: grid; gap: 6px; padding: 6px; }
+    .sp-cell {
+      border-radius: 6px; background: #1a2030; border: 2px solid transparent;
+      cursor: pointer; transition: background 0.15s, border-color 0.1s;
+    }
+    .sp-cell.highlight { background: var(--accent); border-color: var(--accent2); }
+    .sp-cell.picked { background: var(--win); border-color: var(--win); }
+    .sp-cell.wrong { background: var(--lose); }
+
+    /* Emotes */
+    .emote-btn {
+      position: absolute; bottom: 16px; right: 16px;
+      background: var(--panel); border: 1.5px solid var(--border);
+      color: var(--text); width: 44px; height: 44px; border-radius: 50%;
+      font-size: 20px; cursor: pointer; z-index: 20;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    .emote-panel {
+      position: absolute; bottom: 72px; right: 16px;
+      background: var(--panel); border: 1.5px solid var(--border);
+      border-radius: 14px; padding: 8px;
+      display: grid; grid-template-columns: repeat(5, 40px); gap: 4px;
+      z-index: 21; box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    }
+    .emote-panel.hidden { display: none; }
+    .emote-panel button {
+      width: 40px; height: 40px; border: none; background: transparent;
+      font-size: 22px; cursor: pointer; border-radius: 8px;
+    }
+    .emote-panel button:active { background: var(--panel2); transform: scale(0.88); }
+    .emote-bubble {
+      position: absolute; z-index: 30;
+      background: var(--accent); color: #1a1205;
+      padding: 8px 14px; border-radius: 20px;
+      font-size: 22px; font-weight: 800;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      animation: emote-fly 2.5s forwards;
+      pointer-events: none;
+    }
+    @keyframes emote-fly {
+      0%   { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
+      15%  { transform: translate(-50%, -10px) scale(1.15); opacity: 1; }
+      80%  { transform: translate(-50%, -20px) scale(1); opacity: 1; }
+      100% { transform: translate(-50%, -40px) scale(0.8); opacity: 0; }
+    }
+
+    /* Audio Reflex */
+    .audio-area {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #130f1a;
+      cursor: pointer;
+    }
+    .audio-area.go { background: #0f3a1a; }
+    .audio-area.early { background: #3a1313; }
+    .audio-visual {
+      width: 120px; height: 120px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,122,41,0.4), transparent 70%);
+      margin-bottom: 22px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 48px;
+    }
+    .audio-area.go .audio-visual { background: radial-gradient(circle, rgba(38,214,127,0.6), transparent 70%); }
+    .audio-big { font-size: 36px; font-weight: 800; }
+    .audio-hint { color: var(--muted); font-size: 13px; margin-top: 14px; }
+    .audio-attempts { font-family: 'JetBrains Mono',monospace; font-size: 12px; color: var(--accent2); margin-top: 10px; }
+
+    /* Rhythm */
+    .rhy-area {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #0f0f1a;
+    }
+    .rhy-hud {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.5); padding: 6px 16px; border-radius: 20px;
+      font-weight: 700; font-size: 14px; pointer-events: none;
+    }
+    .rhy-metronome {
+      width: 180px; height: 180px; border-radius: 50%;
+      background: radial-gradient(circle, var(--panel2), var(--panel));
+      border: 3px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 64px; margin-bottom: 20px;
+      transition: transform 0.05s, border-color 0.1s, background 0.1s;
+    }
+    .rhy-metronome.beat {
+      transform: scale(1.12);
+      border-color: var(--accent);
+      background: radial-gradient(circle, rgba(255,122,41,0.3), var(--panel));
+    }
+    .rhy-tap {
+      padding: 18px 48px; font-size: 20px; font-weight: 800;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      color: #1a1205; border: none; border-radius: 50px;
+      cursor: pointer; min-width: 200px;
+    }
+    .rhy-tap:active { transform: scale(0.94); }
+    .rhy-result { margin-top: 14px; font-size: 14px; font-weight: 700; min-height: 20px; }
+
+    /* Balance */
+    .bal-area {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #0a1220;
+      overflow: hidden;
+      touch-action: none;
+    }
+    .bal-hud {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.5); padding: 6px 16px; border-radius: 20px;
+      font-weight: 700; font-size: 14px; pointer-events: none;
+    }
+    .bal-ring {
+      width: 260px; height: 260px; border-radius: 50%;
+      border: 2px dashed rgba(255,255,255,0.15);
+      position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .bal-target {
+      width: 90px; height: 90px; border-radius: 50%;
+      border: 2px solid var(--win);
+      background: rgba(38,214,127,0.08);
+      position: absolute;
+    }
+    .bal-ball {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: radial-gradient(circle, var(--accent2), var(--accent));
+      box-shadow: 0 0 20px rgba(255,122,41,0.6);
+      position: absolute;
+      transition: transform 0.04s linear;
+    }
+    .bal-hint { margin-top: 20px; color: var(--muted); font-size: 12px; text-align: center; padding: 0 20px; }
+
+    /* Quick Draw */
+    .qd-area {
+      position: absolute; inset: 0;
+      background: #0a0f1a;
+      overflow: hidden;
+    }
+    .qd-hud {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.5); padding: 6px 16px; border-radius: 20px;
+      font-weight: 700; font-size: 14px; pointer-events: none; z-index: 5;
+    }
+    .qd-svg {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+    }
+    .qd-dot {
+      position: absolute;
+      width: 38px; height: 38px; border-radius: 50%;
+      background: var(--panel);
+      border: 2px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 14px;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+    }
+    .qd-dot.next {
+      background: var(--accent);
+      border-color: var(--accent2);
+      color: #1a1205;
+      animation: qd-pulse 0.8s infinite;
+    }
+    .qd-dot.done {
+      background: var(--win);
+      border-color: var(--win);
+      color: #0e0f13;
+      opacity: 0.5;
+    }
+    @keyframes qd-pulse {
+      50% { box-shadow: 0 0 0 8px rgba(255,122,41,0.25); }
+    }
+
+    /* ── Victory VFX ── */
+    .vfx-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 4000; overflow: hidden; }
+    .vfx-particle { position: absolute; will-change: transform, opacity; }
+
+    /* Confetti */
+    .vfx-confetti .vfx-particle {
+      width: 10px; height: 14px;
+      animation: vfx-fall 2.4s linear forwards;
+    }
+    @keyframes vfx-fall {
+      0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(110vh) rotate(720deg); opacity: 0.6; }
+    }
+
+    /* Fire */
+    .vfx-fire {
+      background: radial-gradient(ellipse at bottom, rgba(255,122,41,0.35), rgba(0,0,0,0) 70%);
+      animation: vfx-fade 2.2s forwards;
+    }
+    .vfx-fire .vfx-particle {
+      width: 20px; height: 30px; border-radius: 50% 50% 10% 10%;
+      background: radial-gradient(ellipse, #ff7a29, #ff4d6d);
+      filter: blur(2px);
+      animation: vfx-rise 1.8s ease-out forwards;
+    }
+    @keyframes vfx-rise {
+      0%   { transform: translateY(100vh) scale(1); opacity: 1; }
+      100% { transform: translateY(-20vh) scale(0.3); opacity: 0; }
+    }
+    @keyframes vfx-fade { 0% {opacity: 0;} 30% {opacity: 1;} 100% {opacity: 0;} }
+
+    /* Lightning */
+    .vfx-lightning {
+      animation: vfx-flash 0.12s 4 steps(1);
+    }
+    @keyframes vfx-flash {
+      0% { background: rgba(255,255,255,0.9); }
+      100% { background: transparent; }
+    }
+    .vfx-lightning .vfx-bolt {
+      position: absolute; top: 0; width: 6px;
+      background: linear-gradient(to bottom, #a78bfa, #7dd3fc, transparent);
+      filter: drop-shadow(0 0 12px #a78bfa);
+      height: 100vh;
+      animation: vfx-fade 1.2s forwards;
+    }
+
+    /* Stars */
+    .vfx-stars .vfx-particle {
+      font-size: 28px;
+      animation: vfx-twinkle 2s ease-out forwards;
+    }
+    @keyframes vfx-twinkle {
+      0%   { transform: scale(0) rotate(0); opacity: 0; }
+      50%  { transform: scale(1.3) rotate(180deg); opacity: 1; }
+      100% { transform: scale(0.5) rotate(360deg) translateY(50px); opacity: 0; }
+    }
+
+    /* Explosion */
+    .vfx-explosion {
+      background: radial-gradient(circle at center, rgba(255,184,107,0.6), rgba(0,0,0,0) 60%);
+      animation: vfx-boom 1s forwards;
+    }
+    @keyframes vfx-boom {
+      0%   { transform: scale(0.1); opacity: 1; }
+      100% { transform: scale(3); opacity: 0; }
+    }
+
+    /* ── Battle Pass UI ── */
+    .bp-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 3000;
+      display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    .bp-overlay.open { display: flex; }
+    .bp-inner {
+      background: var(--panel); border: 1.5px solid var(--border);
+      border-radius: 16px; padding: 16px; max-width: 460px; width: 100%;
+      max-height: 92vh; overflow-y: auto;
+    }
+    .bp-head {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+    }
+    .bp-xp-bar {
+      background: var(--panel2); height: 10px; border-radius: 5px; overflow: hidden;
+      margin: 8px 0 14px;
+    }
+    .bp-xp-fill {
+      height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2));
+    }
+    .bp-row {
+      display: grid; grid-template-columns: 40px 1fr 1fr; gap: 8px;
+      padding: 8px 0; border-bottom: 1px solid var(--border); align-items: center;
+    }
+    .bp-row .lvl { font-weight: 800; color: var(--muted); text-align: center; }
+    .bp-reward {
+      background: var(--panel2); border: 1px solid var(--border);
+      padding: 8px; border-radius: 8px; font-size: 12px; text-align: center;
+    }
+    .bp-reward.claimed { opacity: 0.4; }
+    .bp-reward.locked { opacity: 0.35; }
+    .bp-reward.ready { border-color: var(--win); background: rgba(38,214,127,0.1); }
+    .bp-reward.premium-only { background: linear-gradient(135deg, rgba(167,139,250,0.15), var(--panel2)); border-color: #a78bfa; }
+
+    /* ── Round result ── */
+    .round-result-overlay {
+      position: absolute; inset: 0;
+      background: rgba(14, 15, 19, 0.94);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 10;
+    }
+    .round-result-overlay .verdict {
+      font-size: 60px; font-weight: 800; margin-bottom: 20px;
+    }
+    .round-result-overlay .verdict.win { color: var(--win); }
+    .round-result-overlay .verdict.lose { color: var(--lose); }
+    .round-result-overlay .verdict.draw { color: var(--warn); }
+    .round-result-overlay .scores {
+      display: flex; gap: 60px; font-size: 22px; margin-bottom: 30px;
+    }
+    .round-result-overlay .scores .me { color: var(--win); }
+    .round-result-overlay .scores .opp { color: var(--lose); }
+    .round-result-overlay .next { color: var(--muted); font-size: 14px; }
+
+    /* ── Match finished ── */
+    .finished {
+      max-width: 560px; margin: 40px auto; padding: 0 16px;
+      text-align: center;
+    }
+    .finished h1 { font-size: 48px; margin: 10px 0; }
+    .finished h1.won { color: var(--win); }
+    .finished h1.lost { color: var(--lose); }
+    .finished .final-score { font-size: 64px; font-weight: 800; margin: 20px 0; }
+    .finished .reward {
+      background: var(--panel); border: 1px solid var(--border);
+      padding: 14px; border-radius: 12px; margin: 16px 0; font-size: 16px;
+    }
+    .finished .again {
+      display: block; width: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      color: #1a1205; border: none;
+      padding: 16px; border-radius: 12px; font-size: 16px; font-weight: 800;
+      margin-top: 12px;
+    }
+
+    /* Auth prompt */
+    .auth-prompt {
+      max-width: 420px; margin: 60px auto; text-align: center; padding: 20px;
+    }
+    .auth-prompt h2 { margin: 0 0 16px; }
+    .auth-prompt input {
+      width: 100%; padding: 12px; margin: 8px 0;
+      background: var(--panel2); border: 1.5px solid var(--border);
+      color: var(--text); border-radius: 10px; font-size: 14px;
+    }
+    .auth-prompt button {
+      width: 100%; padding: 14px; margin-top: 12px;
+      background: var(--accent); color: #1a1205; border: none; border-radius: 10px;
+      font-weight: 800; font-size: 15px;
+    }
+    .auth-prompt .err { color: var(--lose); font-size: 13px; margin-top: 10px; }
+    .auth-prompt .hint { color: var(--muted); font-size: 12px; margin-top: 14px; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+    <button class="back-btn" onclick="location.href='/'" style="flex-shrink:0;">←</button>
+    <div class="logo">⚡ <span class="logo-full">REFLEX ARENA</span></div>
+  </div>
+  <div class="right" id="top-right">
+    <span class="chip elo">ELO: <span id="top-elo">—</span></span>
+    <span class="chip coins">💰 <span id="top-coins">—</span></span>
+    <span id="top-nick" style="font-weight: 700;"></span>
+    <button id="top-claim-btn" onclick="openClaimModal()" style="display:none;background:linear-gradient(90deg,#26d67f,#7fe3b0);color:#0e0f13;border:none;padding:6px 14px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;">💾 Сохранить</button>
+    <button id="install-btn" onclick="triggerInstall()" style="display:none;background:var(--accent);color:#1a1205;border:none;padding:6px 10px;border-radius:8px;font-weight:700;font-size:11px;cursor:pointer;">📲 Install</button>
+  </div>
+</div>
+
+<div class="app">
+  <!-- ── Auth screen ── -->
+  <div class="screen" id="screen-auth">
+    <div class="auth-prompt">
+      <h2>Войти в Reflex Arena</h2>
+      <input id="auth-nick" placeholder="Никнейм" autocomplete="off" />
+      <input id="auth-pass" placeholder="Пароль" type="password" autocomplete="off" />
+      <button onclick="doLogin()">Войти</button>
+      <div class="err" id="auth-err"></div>
+      <div class="hint">Нет аккаунта? Сначала зарегистрируйся на <a href="/" style="color: var(--accent);">главной</a>.</div>
+    </div>
+  </div>
+
+  <!-- ── Lobby ── -->
+  <div class="screen" id="screen-lobby">
+    <div class="lobby">
+      <div id="guest-banner" style="display:none;background:linear-gradient(90deg,rgba(38,214,127,0.15),rgba(127,227,176,0.08));border:1px solid #26d67f;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:700;color:#26d67f;">🎁 Сохрани прогресс — получи +100 💰</div>
+            <div style="font-size:13px;color:var(--muted);margin-top:4px;">Ты играешь как гость. Создай аккаунт чтобы не потерять рейтинг и предметы.</div>
+          </div>
+          <button class="stake-btn selected" style="white-space:nowrap;" onclick="openClaimModal()">Сохранить →</button>
+        </div>
+      </div>
+      <h1>1v1 на реакцию</h1>
+      <div class="sub">Best of 5 • случайные мини-игры • победитель забирает банк</div>
+
+      <div class="panel">
+        <h3>Ставка</h3>
+        <div class="stake-row" id="stake-row">
+          <button class="stake-btn selected" data-stake="0">Бесплатно</button>
+          <button class="stake-btn" data-stake="10">10 💰</button>
+          <button class="stake-btn" data-stake="50">50 💰</button>
+          <button class="stake-btn" data-stake="200">200 💰</button>
+        </div>
+        <input class="stake-custom" id="stake-custom" type="number" min="0" max="1000" placeholder="Своя ставка (0–1000)" />
+        <button class="play-btn" id="play-btn" onclick="findMatch()">Найти матч</button>
+        <button class="play-btn" onclick="findDeathmatch()" style="background:linear-gradient(90deg,#ff4d6d,#ff7a29);color:#fff;margin-top:8px;box-shadow:0 6px 20px rgba(255,77,109,0.35);">💀 Deathmatch Bo15 (≥200 💰)</button>
+      </div>
+
+      <div class="panel" id="bp-panel">
+        <h3>Battle Pass ⚔️</h3>
+        <div id="bp-summary"><div style="color:var(--muted);font-size:13px;">Загрузка...</div></div>
+      </div>
+
+      <div class="panel">
+        <h3>Магазин тем 🎨</h3>
+        <div id="shop-themes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Победные эффекты 🎆</h3>
+        <div style="color:var(--muted);font-size:12px;margin-bottom:10px;">Играет при твоей победе в матче.</div>
+        <div id="shop-vfx" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Аватары 🦊</h3>
+        <div id="shop-avatars" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px;"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Испытание дня 🔥</h3>
+        <div id="dc-block">
+          <div style="color: var(--muted); font-size: 13px;">Загрузка...</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Сыграть с другом</h3>
+        <div style="color: var(--muted); font-size: 13px; margin-bottom: 10px;">
+          Создай комнату — кинь ссылку другу. Как только он откроет — матч стартует.
+        </div>
+        <button class="play-btn" onclick="createCustomRoom()" style="background:linear-gradient(90deg,#7dd3fc,#a78bfa);color:#0e0f13;">🔗 Создать комнату</button>
+      </div>
+
+      <div class="panel">
+        <h3>Практика с ботом</h3>
+        <div style="color: var(--muted); font-size: 13px; margin-bottom: 10px;">Без ставок и рейтинга. Потренируйся.</div>
+        <div class="stake-row">
+          <button class="stake-btn" onclick="playVsAi('easy')" style="font-size:13px;">🤖 Новичок</button>
+          <button class="stake-btn" onclick="playVsAi('medium')" style="font-size:13px;">🤖 Средний</button>
+          <button class="stake-btn" onclick="playVsAi('hard')" style="font-size:13px;">🤖 Мастер</button>
+          <button class="stake-btn" disabled style="opacity:0.4;font-size:13px;">Скоро</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Моя статистика</h3>
+        <div class="stats-row">
+          <div class="stat"><div class="v" id="st-elo">—</div><div class="l">ELO</div></div>
+          <div class="stat"><div class="v" id="st-wins">—</div><div class="l">Победы</div></div>
+          <div class="stat"><div class="v" id="st-losses">—</div><div class="l">Поражения</div></div>
+          <div class="stat"><div class="v" id="st-wr">—</div><div class="l">Winrate</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Задания на сегодня</h3>
+        <div id="daily-list"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Друзья</h3>
+        <div style="display:flex;gap:6px;margin-bottom:10px;">
+          <input id="friend-nick" placeholder="Ник друга" autocomplete="off" style="flex:1;padding:10px;background:var(--panel2);border:1.5px solid var(--border);color:var(--text);border-radius:8px;font-size:14px;" />
+          <button class="stake-btn" style="width:auto;padding:10px 14px;font-size:13px;" onclick="addFriend()">+ Добавить</button>
+        </div>
+        <div id="friends-list"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Достижения</h3>
+        <div id="ach-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Последние матчи</h3>
+        <div id="recent-list"><div style="color: var(--muted); font-size: 13px;">Ещё нет матчей</div></div>
+      </div>
+
+      <div class="panel">
+        <h3>Кейсы 📦</h3>
+        <div style="color:var(--muted);font-size:12px;margin-bottom:10px;">Открой кейс — получи предмет в коллекцию. Дубликат = монеты.</div>
+        <div id="cases-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Коллекция 🎒 <span id="collection-counter" style="color:var(--accent2);font-weight:400;font-size:12px;"></span></h3>
+        <div id="collection-list"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Рейтинги по категориям</h3>
+        <div id="cat-elo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;"></div>
+      </div>
+
+      <div class="panel" id="referral-panel">
+        <h3>Пригласи друга — +100 💰 обоим</h3>
+        <div style="color: var(--muted); font-size: 13px; margin-bottom: 10px;">
+          Друг регистрируется по твоей ссылке → оба получают бонус монет.
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <input id="ref-link" readonly style="flex:1;min-width:0;padding:10px;background:var(--panel2);border:1.5px solid var(--border);color:var(--text);border-radius:8px;font-size:13px;" />
+          <button class="stake-btn" style="width:auto;padding:10px 16px;font-size:13px;" onclick="copyRefLink()">Скопировать</button>
+        </div>
+        <div id="ref-info" style="color: var(--muted); font-size: 12px; margin-top: 10px;"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Топ игроков</h3>
+        <div style="overflow-x: auto;">
+          <table class="lb-table">
+            <thead>
+              <tr><th>#</th><th>Игрок</th><th style="text-align: right;">ELO</th><th style="text-align: right;">W/L</th></tr>
+            </thead>
+            <tbody id="lb-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Queue ── -->
+  <div class="screen" id="screen-queue">
+    <div class="queue">
+      <div class="spinner"></div>
+      <h2>Ищем соперника...</h2>
+      <div class="wait-time">Ставка: <span id="queue-stake">—</span> 💰 • Время: <span id="queue-time">0</span> сек</div>
+      <button class="cancel-btn" onclick="cancelQueue()">Отменить</button>
+    </div>
+  </div>
+
+  <!-- ── Match ── -->
+  <div class="screen" id="screen-match">
+    <div class="match">
+      <div class="match-header">
+        <div class="player-box">
+          <div>
+            <div class="name" id="p1-name">—</div>
+            <div style="font-size: 11px; color: var(--muted);" id="p1-elo">ELO —</div>
+          </div>
+          <div class="score" id="p1-score">0</div>
+        </div>
+        <div class="round-info">
+          <div style="font-weight: 700; font-size: 14px;" id="match-round">Раунд 1 / 5</div>
+          <div id="match-stake" style="margin-top: 2px;"></div>
+        </div>
+        <div class="player-box right">
+          <div class="score" id="p2-score">0</div>
+          <div>
+            <div class="name" id="p2-name">—</div>
+            <div style="font-size: 11px; color: var(--muted);" id="p2-elo">ELO —</div>
+          </div>
+        </div>
+      </div>
+      <div class="round-progress" id="round-progress"></div>
+      <div class="game-area" id="game-area"></div>
+      <button class="emote-btn" id="emote-btn" onclick="toggleEmotePanel()" title="Эмоуты">😀</button>
+      <div class="emote-panel hidden" id="emote-panel"></div>
+    </div>
+  </div>
+
+  <!-- ── Battle Pass modal ── -->
+  <div class="bp-overlay" id="bp-overlay">
+    <div class="bp-inner">
+      <div class="bp-head">
+        <div>
+          <h2 style="margin:0;font-size:20px;">Battle Pass</h2>
+          <div style="color:var(--muted);font-size:12px;" id="bp-season-info"></div>
+        </div>
+        <button onclick="closeBP()" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:8px;cursor:pointer;">✕</button>
+      </div>
+      <div id="bp-progress-block"></div>
+      <div id="bp-rows"></div>
+    </div>
+  </div>
+
+  <!-- ── Onboarding modal ── -->
+  <div id="onboard-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2500;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--panel);border:1.5px solid var(--accent);border-radius:16px;padding:24px;max-width:400px;width:100%;max-height:90vh;overflow-y:auto;">
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:52px;margin-bottom:6px;">⚡</div>
+        <h2 style="margin:0;">Добро пожаловать в Reflex Arena</h2>
+      </div>
+      <div style="color:var(--muted);font-size:14px;line-height:1.5;margin-bottom:16px;">
+        <b style="color:var(--text);">Как играть:</b><br>
+        • Матч 1v1 до 3 побед (Best of 5)<br>
+        • 13 случайных мини-игр на реакцию<br>
+        • Победитель забирает банк + ELO<br>
+      </div>
+      <div style="color:var(--muted);font-size:14px;line-height:1.5;margin-bottom:16px;">
+        <b style="color:var(--text);">Режимы:</b><br>
+        • <span style="color:var(--accent);">Найти матч</span> — играй рандомом<br>
+        • <span style="color:var(--win);">С ботом</span> — потренируйся<br>
+        • <span style="color:#7dd3fc;">Комната по ссылке</span> — с другом<br>
+        • <span style="color:#ffc93c;">Испытание дня</span> — solo топ
+      </div>
+      <div style="color:var(--muted);font-size:13px;margin-bottom:18px;padding:10px;background:var(--panel2);border-radius:8px;">
+        💡 Добавь страницу на главный экран — запускается как приложение
+      </div>
+      <button onclick="closeOnboarding()" style="width:100%;padding:14px;background:linear-gradient(90deg,var(--accent),var(--accent2));color:#1a1205;border:none;border-radius:10px;font-weight:800;font-size:15px;cursor:pointer;">Понял, поехали →</button>
+    </div>
+  </div>
+
+  <!-- ── Claim modal ── -->
+  <div id="claim-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2000;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:400px;width:100%;">
+      <h2 style="margin:0 0 8px;">Сохрани прогресс</h2>
+      <div style="color:var(--muted);font-size:13px;margin-bottom:16px;">Выбери ник и пароль. Весь твой рейтинг, монеты и предметы сохранятся. Бонус: +100 💰.</div>
+      <input id="claim-nick" placeholder="Новый ник (3-24 символа)" autocomplete="off" style="width:100%;padding:12px;margin-bottom:10px;background:var(--panel2);border:1.5px solid var(--border);color:var(--text);border-radius:10px;font-size:14px;" />
+      <input id="claim-pass" placeholder="Пароль (мин 4 символа)" type="password" style="width:100%;padding:12px;margin-bottom:10px;background:var(--panel2);border:1.5px solid var(--border);color:var(--text);border-radius:10px;font-size:14px;" />
+      <div id="claim-err" style="color:var(--lose);font-size:13px;min-height:18px;margin-bottom:10px;"></div>
+      <button onclick="submitClaim()" style="width:100%;padding:14px;background:linear-gradient(90deg,#26d67f,#7fe3b0);color:#0e0f13;border:none;border-radius:10px;font-weight:800;font-size:15px;cursor:pointer;">Сохранить</button>
+      <button onclick="closeClaimModal()" style="width:100%;padding:10px;margin-top:8px;background:transparent;border:1px solid var(--border);color:var(--text);border-radius:10px;cursor:pointer;">Позже</button>
+    </div>
+  </div>
+
+  <!-- ── Match finished ── -->
+  <div class="screen" id="screen-finished">
+    <div class="finished">
+      <div id="fin-emoji" style="font-size: 72px;"></div>
+      <h1 id="fin-title"></h1>
+      <div class="final-score" id="fin-score"></div>
+      <div class="reward" id="fin-reward"></div>
+      <button class="again" onclick="shareMatchResult()" style="background:linear-gradient(90deg,#26d67f,#7fe3b0);margin-bottom:10px;">📸 Поделиться результатом</button>
+      <button class="again" onclick="goLobby()">Ещё раз</button>
+      <button class="cancel-btn" style="margin-top: 10px; width: 100%;" onclick="location.href='/'">На главную</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/trivia_questions.js"></script>
+<script>
+// ═════════════════════════════════════════════════════════════
+//   Auth / API
+// ═════════════════════════════════════════════════════════════
+const API = {
+  token: () => localStorage.getItem('pp_token') || '',
+  setToken: (t) => localStorage.setItem('pp_token', t),
+  clearToken: () => localStorage.removeItem('pp_token'),
+  async get(path) {
+    const r = await fetch(path, { headers: { 'Authorization': 'Bearer ' + API.token() }});
+    return r.json();
+  },
+  async post(path, body) {
+    const r = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + API.token() },
+      body: JSON.stringify(body || {}),
+    });
+    return r.json();
+  }
+};
+
+let ME = null;
+let currentStake = 0;
+let ws = null;
+let queueStartTs = 0;
+let queueTimer = null;
+
+function $(id) { return document.getElementById(id); }
+
+// Haptic feedback (vibrate API)
+function hap(kind) {
+  try {
+    if (!navigator.vibrate) return;
+    if (kind === 'tap') navigator.vibrate(10);
+    else if (kind === 'success') navigator.vibrate([10, 60, 20]);
+    else if (kind === 'error') navigator.vibrate([50, 40, 50]);
+    else if (kind === 'heavy') navigator.vibrate(40);
+    else navigator.vibrate(10);
+  } catch (e) {}
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $('screen-' + id).classList.add('active');
+  // Прячем панель эмоутов при выходе из матча
+  const ep = $('emote-panel');
+  if (ep) ep.classList.add('hidden');
+}
+
+async function boot() {
+  // Нет токена — создаём гостевой автоматически
+  if (!API.token()) {
+    try {
+      const r = await fetch('/api/guest_login', { method: 'POST' });
+      const data = await r.json();
+      if (data.token) {
+        API.setToken(data.token);
+      } else {
+        showScreen('auth'); return;
+      }
+    } catch (e) {
+      showScreen('auth'); return;
+    }
+  }
+  const me = await API.get('/api/me');
+  if (!me.authenticated) {
+    API.clearToken();
+    // Попытаемся ещё раз через гостя
+    try {
+      const r = await fetch('/api/guest_login', { method: 'POST' });
+      const data = await r.json();
+      if (data.token) API.setToken(data.token);
+    } catch (e) {}
+    const me2 = await API.get('/api/me');
+    if (!me2.authenticated) { showScreen('auth'); return; }
+    ME = me2;
+  } else {
+    ME = me;
+  }
+  renderTop();
+  renderLobby();
+  showScreen('lobby');
+  loadLeaderboard();
+  loadBattlePass();
+  loadShopThemes();
+  loadShopVfx();
+  loadShopAvatars();
+  loadCases();
+  loadCollection();
+  loadCategoryElo();
+  loadDailyChallenge();
+  loadDailyTasks();
+  loadFriends();
+  loadAchievements();
+  loadReferralInfo();
+  tryApplyReferrer();
+  // Если в URL ?room=CODE — сразу присоединяемся
+  const joined = await tryAutoJoinRoom();
+  if (joined) return;
+  // Попытка реконнекта в активный матч
+  tryRejoin();
+  // Онбординг для новых
+  showOnboardingIfNeeded();
+}
+
+let _rejoinInFlight = false;
+function tryRejoin() {
+  if (_rejoinInFlight) return;
+  if (!API.token()) return;
+  _rejoinInFlight = true;
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const url = proto + location.host + '/ws/queue?token=' + encodeURIComponent(API.token());
+  const probe = new WebSocket(url);
+  const cleanup = () => { _rejoinInFlight = false; };
+  probe.onopen = () => {
+    probe.send(JSON.stringify({ type: 'rejoin' }));
+  };
+  probe.onmessage = (e) => {
+    let msg = null;
+    try { msg = JSON.parse(e.data); } catch (_) { return; }
+    if (msg.type === 'no_active_match') {
+      try { probe.close(); } catch (_) {}
+      cleanup();
+      return;
+    }
+    if (msg.type === 'rejoined') {
+      cleanup();
+      // Подцепляемся: делаем этот probe-ws основным
+      // Перед заменой закрываем старый (если был)
+      if (ws && ws !== probe) {
+        try { ws.onmessage = null; ws.onclose = null; ws.close(); } catch (_) {}
+      }
+      ws = probe;
+      MATCH = MATCH || {};
+      MATCH.role = MATCH.role || 'p1';
+      MATCH.best_of = msg.total_rounds || 5;
+      MATCH.you = MATCH.you || { nickname: (ME && ME.nickname) || 'Ты' };
+      MATCH.opponent = MATCH.opponent || { nickname: 'соперник' };
+      MATCH.stake = MATCH.stake || 0;
+      showScreen('match');
+      if (!$('p1-name').textContent || $('p1-name').textContent === '—') {
+        $('p1-name').textContent = MATCH.you.nickname || 'Ты';
+        $('p2-name').textContent = MATCH.opponent.nickname || 'Соперник';
+      }
+      $('p1-score').textContent = msg.rounds_won.p1;
+      $('p2-score').textContent = msg.rounds_won.p2;
+      $('match-round').textContent = `Раунд ${msg.round_num} / ${msg.total_rounds}`;
+      renderRoundProgress(msg.rounds_won, msg.round_num - 1);
+      hideDcBanner();
+      // Дальше слушаем на том же ws
+      ws.onmessage = (ev) => {
+        try { handleServerMsg(JSON.parse(ev.data)); } catch (_) {}
+      };
+      ws.onclose = () => {
+        // Если вдруг закрылся пока мы в матче — попробуем реконнектнуться
+        if ($('screen-match').classList.contains('active') && !matchIsFinished()) {
+          setTimeout(() => tryRejoin(), 500);
+        }
+      };
+      if (msg.game) {
+        $('game-area').innerHTML = `
+          <div class="game-intro">
+            <div class="game-name">${escapeHtml(msg.game_name)}</div>
+            <div class="game-desc">Вернулся в матч! Следующий раунд скоро начнётся...</div>
+          </div>
+        `;
+      }
+      hap('success');
+      return;
+    }
+    if (msg.type === 'error') {
+      cleanup();
+      try { probe.close(); } catch (_) {}
+    }
+  };
+  probe.onerror = () => { cleanup(); };
+  probe.onclose = () => { cleanup(); };
+}
+
+function matchIsFinished() {
+  return $('screen-finished') && $('screen-finished').classList.contains('active');
+}
+
+// Общий обработчик ws.onclose для тех экранов где может понадобиться реконнект
+function handleWsCloseMaybeRejoin() {
+  try { clearInterval(queueTimer); } catch (_) {}
+  if ($('screen-match').classList.contains('active') && !matchIsFinished()) {
+    setTimeout(() => tryRejoin(), 500);
+  }
+}
+
+// ─── Auto-rejoin при возврате в приложение ───
+let _lastVisibilityCheck = 0;
+function maybeRejoinOnVisible() {
+  const now = Date.now();
+  if (now - _lastVisibilityCheck < 1000) return;  // дебаунс
+  _lastVisibilityCheck = now;
+  // Реконнект только если мы залогинены И ws закрыт/отсутствует
+  if (!ME) return;
+  const wsOk = ws && ws.readyState === WebSocket.OPEN;
+  if (wsOk) return;
+  // Не во время активного поиска очереди (findMatch) — там отдельная логика
+  if ($('screen-queue').classList.contains('active')) {
+    // Если был матч — попробуем подцепиться
+    tryRejoin();
+    return;
+  }
+  // В матче, но ws закрыт — срочный реконнект
+  if ($('screen-match').classList.contains('active') && !matchIsFinished()) {
+    tryRejoin();
+    return;
+  }
+  // В лобби — на всякий случай проверим не висит ли матч (внезапное ручное восстановление)
+  tryRejoin();
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    maybeRejoinOnVisible();
+  }
+});
+window.addEventListener('focus', () => maybeRejoinOnVisible());
+window.addEventListener('online', () => maybeRejoinOnVisible());
+window.addEventListener('pageshow', () => maybeRejoinOnVisible());
+
+function renderTop() {
+  if (!ME) return;
+  $('top-nick').textContent = ME.nickname || '';
+  $('top-coins').textContent = ME.coins ?? 0;
+  const elo = ME.elo ?? 1000;
+  const l = getLeague(elo);
+  $('top-elo').innerHTML = `${l.icon} ${Math.round(elo)}`;
+  $('top-elo').style.color = l.color;
+  // Гостевые индикаторы
+  const claimBtn = $('top-claim-btn');
+  const guestBanner = $('guest-banner');
+  if (ME.is_guest) {
+    if (claimBtn) claimBtn.style.display = 'inline-block';
+    if (guestBanner) guestBanner.style.display = 'block';
+  } else {
+    if (claimBtn) claimBtn.style.display = 'none';
+    if (guestBanner) guestBanner.style.display = 'none';
+  }
+}
+
+async function showOnboardingIfNeeded() {
+  if (!ME || ME.onboarded) return;
+  // Показываем модалку
+  $('onboard-modal').style.display = 'flex';
+}
+async function closeOnboarding() {
+  $('onboard-modal').style.display = 'none';
+  try {
+    await API.post('/api/onboarded', {});
+    if (ME) ME.onboarded = true;
+  } catch (e) {}
+  hap('success');
+}
+
+function openClaimModal() {
+  $('claim-modal').style.display = 'flex';
+  $('claim-err').textContent = '';
+  $('claim-nick').value = '';
+  $('claim-pass').value = '';
+  setTimeout(() => $('claim-nick').focus(), 50);
+}
+function closeClaimModal() {
+  $('claim-modal').style.display = 'none';
+}
+async function submitClaim() {
+  const nick = $('claim-nick').value.trim();
+  const pass = $('claim-pass').value;
+  $('claim-err').textContent = '';
+  if (!/^[A-Za-z0-9_-]{3,24}$/.test(nick)) {
+    $('claim-err').textContent = 'Ник: 3-24 символа (латиница/цифры/_-)';
+    return;
+  }
+  if (pass.length < 4) {
+    $('claim-err').textContent = 'Пароль минимум 4 символа';
+    return;
+  }
+  const r = await API.post('/api/claim_guest', { nickname: nick, password: pass });
+  if (!r.ok) {
+    $('claim-err').textContent = r.msg || 'Ошибка';
+    return;
+  }
+  if (r.token) API.setToken(r.token);
+  closeClaimModal();
+  // Обновляем ME
+  const me = await API.get('/api/me');
+  if (me.authenticated) { ME = me; renderTop(); renderLobby(); }
+  // Тост
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#26d67f;color:#0e0f13;padding:12px 22px;border-radius:20px;font-weight:700;z-index:3000;';
+  t.textContent = '🎉 Аккаунт сохранён! +100 💰';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+function renderLobby() {
+  if (!ME) return;
+  $('st-elo').textContent = Math.round(ME.elo);
+  $('st-wins').textContent = ME.wins;
+  $('st-losses').textContent = ME.losses;
+  $('st-wr').textContent = ME.winrate + '%';
+  const recent = $('recent-list');
+  if (!ME.recent_matches || ME.recent_matches.length === 0) {
+    recent.innerHTML = '<div style="color: var(--muted); font-size: 13px;">Ещё нет матчей</div>';
+  } else {
+    recent.innerHTML = ME.recent_matches.map(m => {
+      const dt = m.elo_delta >= 0 ? '+' + m.elo_delta : m.elo_delta;
+      const cls = m.won ? 'w' : 'l';
+      const vs = m.won ? 'победа' : 'поражение';
+      return `<div class="history-item">
+        <div>vs <b>${escapeHtml(m.opponent)}</b> • ${m.score}</div>
+        <div class="${cls}">${vs} (${dt})</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function applyTheme(t) {
+  // Динамически меняем CSS-переменные
+  document.documentElement.style.setProperty('--accent', t.accent);
+  document.documentElement.style.setProperty('--accent2', t.accent2);
+}
+
+async function loadShopThemes() {
+  try {
+    const r = await API.get('/api/shop/themes');
+    const list = r.themes || [];
+    // Применяем экипированную
+    const eq = list.find(t => t.equipped);
+    if (eq) applyTheme(eq);
+    $('shop-themes').innerHTML = list.map(t => {
+      const action = t.owned
+        ? (t.equipped
+            ? `<span style="color:var(--win);font-size:12px;font-weight:700;">✓ надета</span>`
+            : `<button onclick="equipTheme('${t.id}')" style="background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">Надеть</button>`)
+        : `<button onclick="buyTheme('${t.id}', ${t.price})" style="background:linear-gradient(90deg,${t.accent},${t.accent2});color:#1a1205;border:none;padding:6px 12px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;">${t.price} 💰</button>`;
+      return `
+        <div style="background:var(--panel2);border:1.5px solid ${t.equipped ? 'var(--win)' : 'var(--border)'};border-radius:10px;padding:12px;">
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
+            <div style="width:24px;height:24px;border-radius:50%;background:${t.accent};"></div>
+            <div style="width:24px;height:24px;border-radius:50%;background:${t.accent2};"></div>
+          </div>
+          <div style="font-weight:700;font-size:13px;margin-bottom:6px;">${escapeHtml(t.name)}</div>
+          ${action}
+        </div>
+      `;
+    }).join('');
+  } catch (e) {}
+}
+
+async function buyTheme(id, price) {
+  if (!confirm(`Купить тему за ${price} 💰?`)) return;
+  const r = await API.post('/api/shop/buy_theme', { theme_id: id });
+  if (r.ok) {
+    hap('success');
+    ME.coins = r.new_coins; renderTop();
+    loadShopThemes();
+  } else {
+    alert(r.msg || 'Ошибка');
+  }
+}
+async function equipTheme(id) {
+  const r = await API.post('/api/shop/equip_theme', { theme_id: id });
+  if (r.ok) {
+    hap('tap');
+    loadShopThemes();
+  }
+}
+
+async function loadDailyChallenge() {
+  try {
+    const d = await API.get('/api/daily_challenge');
+    const best = d.my_best != null ? d.my_best : '—';
+    let topHtml = '';
+    if (d.top && d.top.length) {
+      topHtml = `<div style="margin-top:12px;">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Топ дня</div>
+        ${d.top.slice(0, 5).map(r => `
+          <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;">
+            <div>#${r.rank} ${escapeHtml(r.nickname)}</div>
+            <div style="font-weight:700;color:var(--accent2);">${r.score}</div>
+          </div>
+        `).join('')}
+      </div>`;
+    }
+    $('dc-block').innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div>
+          <div style="font-weight:700;font-size:16px;">${escapeHtml(d.game_name)}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Твой лучший: <b style="color:var(--accent2);">${best}</b> • попыток: ${d.my_attempts}</div>
+        </div>
+        <button class="stake-btn selected" style="white-space:nowrap;" onclick="playDailyChallenge('${d.game}')">Играть →</button>
+      </div>
+      ${topHtml}
+    `;
+  } catch (e) {}
+}
+
+let DC_GAME = null;
+function playDailyChallenge(game) {
+  DC_GAME = game;
+  showScreen('match');
+  // Рендерим match-header в solo-режиме
+  $('p1-name').textContent = ME.nickname;
+  $('p2-name').textContent = '—';
+  $('p1-score').textContent = '0';
+  $('p2-score').textContent = '—';
+  $('match-round').textContent = 'Испытание дня';
+  $('match-stake').textContent = '';
+  $('round-progress').innerHTML = '';
+  cleanupGame();
+  $('game-area').innerHTML = `
+    <div class="game-intro">
+      <div class="game-name">${escapeHtml({aim:'Снайпер',math:'Устный счёт',odd:'Найди отличие',typing:'Скорость печати',stroop:'Строп-тест',memory:'Память',spatial:'Пространственная память',rhythm:'Ритм',balance:'Баланс',quick_draw:'Быстрый штрих'}[game] || game)}</div>
+      <div class="game-desc">Набери максимум очков. Твой лучший результат дня попадёт в топ.</div>
+      <div class="countdown" id="cd">3</div>
+    </div>
+  `;
+  // Перехватываем sendResult — вместо отправки в WS, отправляем в API/daily_challenge/submit
+  const origSend = window.sendResult;
+  window.sendResult = async (score, elapsed) => {
+    window.sendResult = origSend;  // restore
+    const r = await API.post('/api/daily_challenge/submit', {
+      score: Math.max(0, Math.floor(score)),
+      elapsed_ms: Math.max(0, Math.floor(elapsed)),
+    });
+    let msg = `Твой результат: ${Math.floor(score)}`;
+    if (r.is_best) msg += ` (новый рекорд!)`;
+    $('game-area').innerHTML = `
+      <div class="round-result-overlay">
+        <div class="verdict ${r.is_best ? 'win' : 'draw'}">${r.is_best ? '🏆' : '📊'}</div>
+        <div class="scores"><div style="color:var(--accent2);">${msg}</div></div>
+        <div style="margin-top:20px;"><button class="stake-btn selected" onclick="goLobby()">← В лобби</button></div>
+      </div>
+    `;
+    if (r.is_best) hap('success');
+  };
+  let left = 3;
+  const tick = () => {
+    left--;
+    if (left <= 0) {
+      startMiniGame(game);
+    } else {
+      const cd = $('cd');
+      if (cd) cd.textContent = left;
+      setTimeout(tick, 1000);
+    }
+  };
+  setTimeout(tick, 1000);
+}
+
+async function loadDailyTasks() {
+  try {
+    const r = await API.get('/api/daily_tasks');
+    if (!r.authenticated || !Array.isArray(r.tasks)) return;
+    if (r.tasks.length === 0) {
+      $('daily-list').innerHTML = '<div style="color:var(--muted);font-size:13px;">Задания обновятся завтра</div>';
+      return;
+    }
+    $('daily-list').innerHTML = r.tasks.map(t => {
+      const pct = Math.min(100, Math.round(t.progress / t.target * 100));
+      const isDone = t.progress >= t.target;
+      const btn = t.claimed
+        ? `<span style="color:var(--muted);font-size:12px;">получено</span>`
+        : (isDone
+            ? `<button onclick="claimDaily(${t.id})" style="background:linear-gradient(90deg,#26d67f,#7fe3b0);color:#0e0f13;border:none;padding:6px 14px;border-radius:8px;font-weight:700;cursor:pointer;font-size:12px;">+${t.reward_coins} 💰</button>`
+            : `<span style="color:var(--muted);font-size:12px;">+${t.reward_coins} 💰</span>`);
+      return `
+        <div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;">
+          <div style="font-size:24px;">${t.icon}</div>
+          <div style="flex:1;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <div style="font-weight:600;font-size:13px;${t.claimed ? 'opacity:0.5;text-decoration:line-through;' : ''}">${escapeHtml(t.title)}</div>
+              <div style="font-size:12px;color:var(--muted);">${t.progress}/${t.target}</div>
+            </div>
+            <div style="background:var(--panel2);height:6px;border-radius:3px;overflow:hidden;">
+              <div style="width:${pct}%;height:100%;background:${isDone ? 'var(--win)' : 'var(--accent)'};"></div>
+            </div>
+          </div>
+          <div>${btn}</div>
+        </div>
+      `;
+    }).join('');
+  } catch (e) {}
+}
+
+async function claimDaily(id) {
+  const r = await API.post('/api/daily_tasks/claim', { id });
+  if (r.ok) {
+    // Обновляем coins + список
+    const me = await API.get('/api/me');
+    if (me.authenticated) { ME = me; renderTop(); }
+    loadDailyTasks();
+    const t = document.createElement('div');
+    t.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#26d67f;color:#0e0f13;padding:12px 22px;border-radius:20px;font-weight:700;z-index:3000;';
+    t.textContent = `🎁 +${r.reward} 💰`;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2500);
+  }
+}
+
+// ─── Number Chain (числовая цепочка — логика) ───
+function startNumberChainGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="math-area" id="nc">
+      <div class="math-hud">🔗 <span id="nc-correct">0</span> верно • <span id="nc-time">20.0</span>s</div>
+      <div class="math-expr" id="nc-seq" style="font-size:36px;">—</div>
+      <div class="math-options" id="nc-opts"></div>
+    </div>
+  `;
+  const DURATION = 20000;
+  const t0 = performance.now();
+  let correct = 0, finished = false, rafId = null, lock = false;
+
+  function genChain() {
+    // Простые закономерности: +N, ×2, ×2+1, степени
+    const patterns = [
+      () => { const d = 2 + Math.floor(Math.random()*8); const s = Math.floor(Math.random()*5); return { seq: [s, s+d, s+2*d, s+3*d], ans: s+4*d }; },
+      () => { const b = 2+Math.floor(Math.random()*4); return { seq: [b, b*2, b*4, b*8], ans: b*16 }; },
+      () => { const s = Math.floor(Math.random()*5)+1; return { seq: [s*1, s*2, s*4, s*7], ans: s*11 }; },
+      () => { const b = 1+Math.floor(Math.random()*4); return { seq: [b, b*b, b*b*b], ans: b*b*b*b }; },
+      () => { const d1 = 1+Math.floor(Math.random()*4); const s = Math.floor(Math.random()*3); return { seq: [s, s+d1, s+d1+d1+1, s+d1+d1+1+d1+2], ans: s+d1+d1+1+d1+2+d1+3 }; },
+    ];
+    return patterns[Math.floor(Math.random()*patterns.length)]();
+  }
+
+  function next() {
+    const { seq, ans } = genChain();
+    $('nc-seq').textContent = seq.join(', ') + ', ?';
+    const opts = new Set([ans]);
+    while (opts.size < 4) {
+      const d = Math.floor(Math.random()*11) - 5;
+      if (d !== 0 && ans + d > 0) opts.add(ans + d);
+    }
+    const shuffled = [...opts].sort(() => Math.random() - 0.5);
+    const optsEl = $('nc-opts');
+    optsEl.innerHTML = '';
+    shuffled.forEach(v => {
+      const btn = document.createElement('button');
+      btn.className = 'math-opt';
+      btn.textContent = v;
+      btn.addEventListener('click', () => { if (lock) return; lock = true;
+        if (v === ans) { correct++; $('nc-correct').textContent = correct; btn.classList.add('correct'); hap('success'); }
+        else { btn.classList.add('wrong'); hap('error'); }
+        setTimeout(() => { lock = false; if (!finished) next(); }, 300);
+      });
+      optsEl.appendChild(btn);
+    });
+  }
+
+  const loop = () => {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (performance.now() - t0));
+    $('nc-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) { finished = true; cancelAnimationFrame(rafId);
+      sendResult(correct * 300, performance.now() - t0);
+      $('nc').innerHTML = `<div style="text-align:center;color:white;"><div style="font-size:48px;font-weight:800;">${correct}</div><div style="color:var(--muted);margin-top:6px;">правильных</div></div>`; return; }
+    rafId = requestAnimationFrame(loop);
+  };
+  next(); rafId = requestAnimationFrame(loop);
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
+}
+
+// ─── Visual Memory (запомни картинку из эмодзи — память) ───
+function startVisualMemoryGame() {
+  const area = $('game-area');
+  area.innerHTML = `<div class="math-area" id="vm">
+    <div class="math-hud">🖼️ Раунд <span id="vm-round">1</span> • <span id="vm-score">0</span> очков</div>
+    <div id="vm-content" style="font-size:80px;margin-bottom:24px;"></div>
+    <div class="math-options" id="vm-opts"></div>
+  </div>`;
+  const POOL = ['🦊','🐉','🦅','🐺','🦁','🐸','🦈','🐙','🦂','🐢','🦇','🐧','🦉','🦜','🦩','🐻','🐼','🦄','🐲','🐵','🐶','🐱','🐷','🦀','🐝','🦋','🐞','🐨','🐻‍❄️','🦒'];
+  const ROUNDS = 10;
+  let round = 0, score = 0, finished = false;
+  const t0 = performance.now();
+
+  function nextRound() {
+    round++;
+    if (round > ROUNDS || finished) { finish(); return; }
+    $('vm-round').textContent = round;
+    // Показываем случайный эмодзи
+    const target = POOL[Math.floor(Math.random() * POOL.length)];
+    $('vm-content').textContent = target;
+    $('vm-opts').innerHTML = '';
+    // Через 2 сек — прячем и даём варианты
+    setTimeout(() => {
+      if (finished) return;
+      $('vm-content').textContent = '❓';
+      const opts = new Set([target]);
+      while (opts.size < 4) opts.add(POOL[Math.floor(Math.random() * POOL.length)]);
+      const shuffled = [...opts].sort(() => Math.random() - 0.5);
+      const optsEl = $('vm-opts');
+      shuffled.forEach(v => {
+        const btn = document.createElement('button');
+        btn.className = 'math-opt'; btn.style.fontSize = '36px';
+        btn.textContent = v;
+        btn.addEventListener('click', () => {
+          if (v === target) { score += 200; $('vm-score').textContent = score; hap('success'); }
+          else { hap('error'); }
+          setTimeout(() => nextRound(), 300);
+        });
+        optsEl.appendChild(btn);
+      });
+    }, 2000);
+  }
+
+  function finish() {
+    if (finished) return; finished = true;
+    sendResult(score, performance.now() - t0);
+  }
+  nextRound();
+  return { cleanup: () => { finished = true; } };
+}
+
+// ─── Word Memory (было ли слово в списке? — память) ───
+function startWordMemoryGame() {
+  const area = $('game-area');
+  area.innerHTML = `<div class="math-area" id="wm">
+    <div class="math-hud">📝 <span id="wm-score">0</span> очков • <span id="wm-round">1</span></div>
+    <div id="wm-content" style="font-size:28px;max-width:340px;text-align:center;line-height:1.6;margin-bottom:24px;"></div>
+    <div id="wm-btns" style="display:flex;gap:16px;"></div>
+  </div>`;
+  const WORDS = ['кошка','дерево','солнце','вода','книга','стол','дом','река','небо','снег','огонь','камень','дорога','звезда','мост','поезд','лес','город','свет','время','ветер','облако','цветок','песок','луна','рыба','птица','земля','музыка','мечта','тень','зеркало','лёд','дождь','гора','озеро','корабль','замок','ключ','сердце','молния','пустыня','бабочка','фонтан','робот','радуга','тигр','шторм','ракета','океан'];
+  let round = 0, score = 0, finished = false;
+  const t0 = performance.now();
+
+  function nextRound() {
+    round++;
+    const listLen = Math.min(3 + Math.floor(round / 2), 8);
+    // Показываем список слов
+    const pool = [...WORDS].sort(() => Math.random() - 0.5);
+    const shown = pool.slice(0, listLen);
+    $('wm-content').textContent = shown.join(' • ');
+    $('wm-btns').innerHTML = '';
+    $('wm-round').textContent = round;
+    // Через time — прячем и спрашиваем
+    const showTime = Math.max(1500, 3000 - round * 150);
+    setTimeout(() => {
+      if (finished) return;
+      const isInList = Math.random() < 0.5;
+      let testWord;
+      if (isInList) { testWord = shown[Math.floor(Math.random() * shown.length)]; }
+      else { const notShown = pool.filter(w => !shown.includes(w)); testWord = notShown[Math.floor(Math.random() * notShown.length)]; }
+      $('wm-content').innerHTML = `<div style="font-size:42px;font-weight:800;margin-bottom:10px;">${escapeHtml(testWord)}</div><div style="font-size:14px;color:var(--muted);">Было ли это слово в списке?</div>`;
+      const btns = $('wm-btns');
+      ['Да','Нет'].forEach(label => {
+        const btn = document.createElement('button');
+        btn.className = 'math-opt'; btn.style.minWidth = '100px';
+        btn.textContent = label;
+        btn.addEventListener('click', () => {
+          const correct = (label === 'Да') === isInList;
+          if (correct) { score += 200; $('wm-score').textContent = score; hap('success'); }
+          else { hap('error'); }
+          if (round >= 15 || finished) { finish(); return; }
+          setTimeout(() => nextRound(), 400);
+        });
+        btns.appendChild(btn);
+      });
+    }, showTime);
+  }
+
+  function finish() { if (finished) return; finished = true; sendResult(score, performance.now() - t0); }
+  nextRound();
+  return { cleanup: () => { finished = true; } };
+}
+
+// ─── Trivia (эрудиция — 4 подтипа) ───
+function startTriviaGame(category) {
+  const area = $('game-area');
+  const catNames = { geo: 'География', science: 'Наука', history: 'История', pop: 'Поп-культура' };
+  const catIcons = { geo: '🌍', science: '🔬', history: '📜', pop: '🎬' };
+  area.innerHTML = `<div class="math-area" id="trv">
+    <div class="math-hud">${catIcons[category] || '❓'} <span id="trv-correct">0</span> верно • <span id="trv-time">20.0</span>s</div>
+    <div id="trv-q" style="font-size:20px;font-weight:700;max-width:360px;text-align:center;margin-bottom:22px;padding:0 16px;line-height:1.4;"></div>
+    <div class="math-options" id="trv-opts"></div>
+  </div>`;
+  const DURATION = 20000;
+  const t0 = performance.now();
+  let correct = 0, finished = false, rafId = null, lock = false;
+  let usedIdx = new Set();
+
+  // Загружаем вопросы из глобала (trivia_questions.js)
+  const questions = (typeof TRIVIA_QUESTIONS !== 'undefined' && TRIVIA_QUESTIONS[category]) || [];
+
+  function pickQuestion() {
+    if (usedIdx.size >= questions.length) usedIdx.clear();
+    let idx;
+    do { idx = Math.floor(Math.random() * questions.length); } while (usedIdx.has(idx) && usedIdx.size < questions.length);
+    usedIdx.add(idx);
+    return questions[idx];
+  }
+
+  function next() {
+    if (finished || questions.length === 0) {
+      if (questions.length === 0) {
+        $('trv-q').textContent = 'Вопросы загружаются...';
+        setTimeout(() => { if (!finished) sendResult(0, performance.now() - t0); }, 1000);
+      }
+      return;
+    }
+    const q = pickQuestion();
+    $('trv-q').textContent = q.q;
+    // Перемешиваем ответы (первый = правильный)
+    const correctAns = q.a[0];
+    const shuffled = [...q.a].sort(() => Math.random() - 0.5);
+    const optsEl = $('trv-opts');
+    optsEl.innerHTML = '';
+    lock = false;
+    shuffled.forEach(a => {
+      const btn = document.createElement('button');
+      btn.className = 'math-opt'; btn.style.fontSize = '14px'; btn.style.padding = '14px 10px';
+      btn.textContent = a;
+      btn.addEventListener('click', () => {
+        if (lock || finished) return; lock = true;
+        if (a === correctAns) { correct++; $('trv-correct').textContent = correct; btn.classList.add('correct'); hap('success'); }
+        else {
+          btn.classList.add('wrong'); hap('error');
+          // Подсветим правильный
+          optsEl.querySelectorAll('.math-opt').forEach(b => { if (b.textContent === correctAns) b.classList.add('correct'); });
+        }
+        setTimeout(() => { if (!finished) next(); }, 400);
+      });
+      optsEl.appendChild(btn);
+    });
+  }
+
+  const loop = () => {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (performance.now() - t0));
+    $('trv-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) { finished = true; cancelAnimationFrame(rafId);
+      sendResult(correct * 300, performance.now() - t0);
+      $('trv').innerHTML = `<div style="text-align:center;color:white;"><div style="font-size:48px;font-weight:800;">${correct}</div><div style="color:var(--muted);margin-top:6px;">правильных</div></div>`; return; }
+    rafId = requestAnimationFrame(loop);
+  };
+  next(); rafId = requestAnimationFrame(loop);
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
+}
+
+// ─── VFX ───
+function playVictoryVfx(kind) {
+  const overlay = document.createElement('div');
+  overlay.className = 'vfx-overlay vfx-' + kind;
+  document.body.appendChild(overlay);
+  const colors = ['#ff7a29', '#ffb86b', '#26d67f', '#7dd3fc', '#a78bfa', '#ff4d6d', '#ffd740'];
+  let particles = 0;
+  if (kind === 'confetti') particles = 80;
+  else if (kind === 'fire') particles = 30;
+  else if (kind === 'stars') particles = 40;
+  else if (kind === 'lightning') particles = 6;
+  else if (kind === 'explosion') particles = 0;  // чистый оверлей
+
+  for (let i = 0; i < particles; i++) {
+    const p = document.createElement('div');
+    if (kind === 'lightning') {
+      p.className = 'vfx-bolt';
+      p.style.left = (Math.random() * 100) + '%';
+      p.style.animationDelay = (Math.random() * 0.4) + 's';
+    } else {
+      p.className = 'vfx-particle';
+      p.style.left = (Math.random() * 100) + '%';
+      p.style.animationDelay = (Math.random() * 0.6) + 's';
+      if (kind === 'confetti') {
+        p.style.background = colors[i % colors.length];
+        p.style.transform = `rotate(${Math.random() * 360}deg)`;
+      } else if (kind === 'stars') {
+        p.textContent = ['⭐','✨','💫','🌟'][i % 4];
+        p.style.top = (Math.random() * 80) + '%';
+      } else if (kind === 'fire') {
+        p.style.left = (Math.random() * 100) + '%';
+        p.style.bottom = '0';
+      }
+    }
+    overlay.appendChild(p);
+  }
+  hap('heavy');
+  setTimeout(() => overlay.remove(), 3000);
+}
+
+// ─── Battle Pass ───
+async function loadBattlePass() {
+  try {
+    const d = await API.get('/api/pass');
+    const s = d.season || {};
+    const pg = d.progress || {level: 0, xp: 0, premium: false, claimed_free: [], claimed_premium: []};
+    const xpPerLvl = d.xp_per_level || 100;
+    const curLvl = pg.level || 0;
+    const xpInLvl = (pg.xp || 0) % xpPerLvl;
+    const pct = Math.round(xpInLvl / xpPerLvl * 100);
+    $('bp-summary').innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <div>
+          <div style="font-weight:700;font-size:16px;">${escapeHtml(s.name || 'Сезон')}</div>
+          <div style="font-size:12px;color:var(--muted);">Уровень ${curLvl}/${d.max_level || 30} • Дней осталось: ${s.days_left}</div>
+        </div>
+        <button class="stake-btn selected" style="white-space:nowrap;" onclick="openBP()">Открыть →</button>
+      </div>
+      <div class="bp-xp-bar" style="margin-top:10px;"><div class="bp-xp-fill" style="width:${pct}%;"></div></div>
+    `;
+  } catch (e) {}
+}
+
+async function openBP() {
+  $('bp-overlay').classList.add('open');
+  renderBP();
+}
+function closeBP() {
+  $('bp-overlay').classList.remove('open');
+}
+
+async function renderBP() {
+  const d = await API.get('/api/pass');
+  const s = d.season || {};
+  const pg = d.progress || {level: 0, xp: 0, premium: false, claimed_free: [], claimed_premium: []};
+  const xpPerLvl = d.xp_per_level || 100;
+  $('bp-season-info').textContent = `${escapeHtml(s.name || '')} • ${s.days_left} дн. осталось`;
+  const curLvl = pg.level || 0;
+  const xpInLvl = (pg.xp || 0) % xpPerLvl;
+  const pct = Math.round(xpInLvl / xpPerLvl * 100);
+  const premium = pg.premium;
+  $('bp-progress-block').innerHTML = `
+    <div style="background:var(--panel2);border-radius:10px;padding:10px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;">
+        <b>Уровень ${curLvl}</b>
+        <span style="color:var(--muted);">${pg.xp || 0} XP</span>
+      </div>
+      <div class="bp-xp-bar"><div class="bp-xp-fill" style="width:${pct}%;"></div></div>
+    </div>
+    ${!premium ? `<button onclick="buyPremium()" style="width:100%;padding:12px;background:linear-gradient(90deg,#a78bfa,#c084fc);color:#0e0f13;border:none;border-radius:10px;font-weight:800;cursor:pointer;margin-bottom:12px;">💎 Купить Premium (${d.premium_price} 💰)</button>` : `<div style="background:rgba(167,139,250,0.2);border:1px solid #a78bfa;color:#c084fc;padding:8px;text-align:center;border-radius:8px;margin-bottom:12px;font-weight:700;font-size:13px;">✓ Premium активен</div>`}
+    <div style="display:grid;grid-template-columns:40px 1fr 1fr;gap:8px;padding:6px 0;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;">
+      <div>LVL</div><div>Free</div><div>Premium</div>
+    </div>
+  `;
+  const rowsHtml = [];
+  const claimedFree = new Set(pg.claimed_free || []);
+  const claimedPrem = new Set(pg.claimed_premium || []);
+  for (const r of d.rewards) {
+    const freeReady = curLvl >= r.level && !claimedFree.has(r.level) && r.free;
+    const premReady = premium && curLvl >= r.level && !claimedPrem.has(r.level) && r.premium;
+    rowsHtml.push(`
+      <div class="bp-row">
+        <div class="lvl">${r.level}</div>
+        <div class="bp-reward ${claimedFree.has(r.level) ? 'claimed' : (freeReady ? 'ready' : 'locked')}"
+             ${freeReady ? `onclick="claimBP(${r.level}, 'free')"` : ''} style="cursor:${freeReady ? 'pointer' : 'default'};">
+          ${r.free ? renderBpReward(r.free) : '—'}
+        </div>
+        <div class="bp-reward premium-only ${claimedPrem.has(r.level) ? 'claimed' : (premReady ? 'ready' : 'locked')}"
+             ${premReady ? `onclick="claimBP(${r.level}, 'premium')"` : ''} style="cursor:${premReady ? 'pointer' : 'default'};">
+          ${r.premium ? renderBpReward(r.premium) : '—'}
+        </div>
+      </div>
+    `);
+  }
+  $('bp-rows').innerHTML = rowsHtml.join('');
+}
+
+function renderBpReward(r) {
+  const icon = r.icon || '🎁';
+  if (r.type === 'coins') return `${icon} ${r.amount} 💰`;
+  if (r.type === 'theme') return `${icon} ${escapeHtml(r.name || 'Тема')}`;
+  if (r.type === 'vfx') return `${icon} ${escapeHtml(r.name || 'Эффект')}`;
+  if (r.type === 'frame') return `${icon} ${escapeHtml(r.name || 'Рамка')}`;
+  return `${icon} ${escapeHtml(r.name || r.code || '—')}`;
+}
+
+async function buyPremium() {
+  const r = await API.post('/api/pass/buy_premium', {});
+  if (r.ok) {
+    hap('success');
+    ME.coins = r.new_coins; renderTop();
+    renderBP();
+  } else {
+    alert(r.msg || 'Ошибка');
+  }
+}
+
+async function claimBP(level, track) {
+  const r = await API.post('/api/pass/claim', { level, track });
+  if (r.ok) {
+    hap('success');
+    // Обновим coins + BP
+    const me = await API.get('/api/me');
+    if (me.authenticated) { ME = me; renderTop(); }
+    renderBP();
+    loadBattlePass();
+    loadShopThemes();
+    loadShopVfx();
+    // Тост с наградой
+    const t = document.createElement('div');
+    t.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#26d67f;color:#0e0f13;padding:12px 22px;border-radius:20px;font-weight:700;z-index:4000;';
+    t.textContent = `🎁 ${renderBpReward(r.reward).replace(/<[^>]*>/g,'')}`;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+  } else {
+    alert(r.msg || 'Ошибка');
+  }
+}
+
+// ─── VFX shop ───
+async function loadShopVfx() {
+  try {
+    const r = await API.get('/api/shop/vfx');
+    if (!r.vfx) return;
+    $('shop-vfx').innerHTML = r.vfx.map(v => {
+      const preview = {confetti:'🎉',fire:'🔥',lightning:'⚡',stars:'⭐',explosion:'💥'}[v.id] || '✨';
+      const action = v.owned
+        ? (v.equipped
+            ? `<span style="color:var(--win);font-size:12px;font-weight:700;">✓ надет</span>`
+            : `<button onclick="equipVfx('${v.id}')" style="background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;">Надеть</button>`)
+        : `<button onclick="buyVfx('${v.id}', ${v.price})" style="background:var(--accent);color:#1a1205;border:none;padding:4px 10px;border-radius:6px;font-weight:700;font-size:11px;cursor:pointer;">${v.price} 💰</button>`;
+      return `
+        <div style="background:var(--panel2);border:1.5px solid ${v.equipped ? 'var(--win)' : 'var(--border)'};border-radius:10px;padding:10px;text-align:center;">
+          <div style="font-size:36px;margin-bottom:4px;cursor:pointer;" onclick="previewVfx('${v.id}')">${preview}</div>
+          <div style="font-weight:700;font-size:12px;margin-bottom:6px;">${escapeHtml(v.name)}</div>
+          ${action}
+        </div>
+      `;
+    }).join('');
+  } catch (e) {}
+}
+function previewVfx(id) { playVictoryVfx(id); }
+async function buyVfx(id, price) {
+  if (!confirm(`Купить эффект за ${price} 💰?`)) return;
+  const r = await API.post('/api/shop/buy_vfx', { vfx_id: id });
+  if (r.ok) {
+    hap('success');
+    ME.coins = r.new_coins; renderTop();
+    loadShopVfx();
+  } else alert(r.msg || 'Ошибка');
+}
+async function equipVfx(id) {
+  const r = await API.post('/api/shop/equip_vfx', { vfx_id: id });
+  if (r.ok) { hap('tap'); loadShopVfx(); }
+}
+
+// ─── Аватары ───
+async function loadShopAvatars() {
+  try {
+    const r = await API.get('/api/shop/avatars');
+    if (!r.avatars) return;
+    $('shop-avatars').innerHTML = r.avatars.map(a => {
+      const border = a.equipped ? 'var(--win)' : (a.owned ? 'var(--border)' : '#444');
+      const action = a.owned
+        ? (a.equipped ? '' : `<div style="font-size:9px;color:var(--muted);margin-top:2px;">тап = надеть</div>`)
+        : `<div style="font-size:9px;color:var(--accent2);margin-top:2px;">${a.price} 💰</div>`;
+      const handler = a.owned
+        ? `equipAvatar('${a.id}')`
+        : `buyAvatar('${a.id}', ${a.price})`;
+      return `
+        <div onclick="${handler}" style="cursor:pointer;text-align:center;">
+          <div style="width:60px;height:60px;border-radius:14px;background:${a.gradient};border:2px solid ${border};display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto;${!a.owned ? 'opacity:0.55;' : ''}">${a.emoji}</div>
+          ${action}
+        </div>
+      `;
+    }).join('');
+  } catch (e) {}
+}
+async function buyAvatar(id, price) {
+  if (!confirm(`Купить аватар за ${price} 💰?`)) return;
+  const r = await API.post('/api/shop/buy_avatar', { avatar_id: id });
+  if (r.ok) {
+    hap('success');
+    ME.coins = r.new_coins; renderTop();
+    loadShopAvatars();
+  } else alert(r.msg || 'Ошибка');
+}
+async function equipAvatar(id) {
+  const r = await API.post('/api/shop/equip_avatar', { avatar_id: id });
+  if (r.ok) { hap('tap'); loadShopAvatars(); }
+}
+
+async function loadFriends() {
+  try {
+    const r = await API.get('/api/friends');
+    if (!r.authenticated) return;
+    const html = [];
+    if (r.incoming.length) {
+      html.push('<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Запросы тебе</div>');
+      r.incoming.forEach(f => {
+        html.push(`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;">
+          <div><b>${escapeHtml(f.nickname)}</b> <span style="color:var(--muted);font-size:12px;">ELO ${Math.round(f.elo)}</span></div>
+          <button onclick="acceptFriend(${f.id})" style="background:var(--win);color:#0e0f13;border:none;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">Принять</button>
+        </div>`);
+      });
+    }
+    if (r.friends.length) {
+      html.push('<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin:10px 0 6px;">Мои друзья</div>');
+      r.friends.forEach(f => {
+        html.push(`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+          <a href="/profile/${encodeURIComponent(f.nickname)}" style="text-decoration:none;color:var(--text);"><b>${escapeHtml(f.nickname)}</b> <span style="color:var(--muted);font-size:12px;">ELO ${Math.round(f.elo)}</span></a>
+          <div style="display:flex;gap:4px;">
+            <button onclick="createRoomAndInvite('${escapeHtml(f.nickname)}')" style="background:var(--accent);color:#1a1205;border:none;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">Вызвать</button>
+            <button onclick="removeFriend(${f.id})" style="background:transparent;border:1px solid var(--border);color:var(--muted);padding:4px 8px;border-radius:6px;font-size:12px;cursor:pointer;">×</button>
+          </div>
+        </div>`);
+      });
+    }
+    if (r.outgoing.length) {
+      html.push('<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin:10px 0 6px;">Ожидают ответа</div>');
+      r.outgoing.forEach(f => {
+        html.push(`<div style="padding:4px 0;font-size:13px;color:var(--muted);">→ ${escapeHtml(f.nickname)}</div>`);
+      });
+    }
+    if (!html.length) html.push('<div style="color:var(--muted);font-size:13px;">Нет друзей. Добавь первого!</div>');
+    $('friends-list').innerHTML = html.join('');
+  } catch (e) {}
+}
+
+async function addFriend() {
+  const nick = $('friend-nick').value.trim();
+  if (!nick) return;
+  const r = await API.post('/api/friends/add', { nickname: nick });
+  if (r.ok) {
+    $('friend-nick').value = '';
+    hap('success');
+    loadFriends();
+  } else {
+    alert(r.msg || 'Ошибка');
+  }
+}
+async function acceptFriend(id) {
+  const r = await API.post('/api/friends/accept', { friend_id: id });
+  if (r.ok) { hap('success'); loadFriends(); }
+}
+async function removeFriend(id) {
+  if (!confirm('Удалить из друзей?')) return;
+  const r = await API.post('/api/friends/remove', { friend_id: id });
+  if (r.ok) loadFriends();
+}
+function createRoomAndInvite(nick) {
+  // Реюзаем createCustomRoom, но после room_created сразу шарим с подписью что это для <nick>
+  createCustomRoom();
+  // Перехватываем показ ссылки — допишем имя в подсказке (простая доработка)
+  const orig = showRoomCreated;
+  showRoomCreated = function(code) {
+    orig(code);
+    const qh = document.querySelector('#screen-queue h2');
+    if (qh) qh.textContent = `Комната для ${nick}: ${code}`;
+    showRoomCreated = orig;
+  };
+}
+
+async function loadAchievements() {
+  try {
+    const rows = await API.get('/api/achievements');
+    if (!Array.isArray(rows)) return;
+    $('ach-list').innerHTML = rows.map(a => `
+      <div style="background:var(--panel2);border:1px solid ${a.unlocked ? 'var(--accent)' : 'var(--border)'};border-radius:10px;padding:10px;${a.unlocked ? '' : 'opacity:0.45;'}">
+        <div style="font-size:22px;margin-bottom:4px;">${a.icon}</div>
+        <div style="font-weight:700;font-size:13px;">${escapeHtml(a.name)}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${escapeHtml(a.desc)}</div>
+      </div>
+    `).join('');
+  } catch (e) {}
+}
+
+async function loadCases() {
+  try {
+    const r = await API.get('/api/cases');
+    if (!r.cases) return;
+    $('cases-list').innerHTML = r.cases.map(c => `
+      <div style="background:var(--panel2);border:1.5px solid var(--border);border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:42px;margin-bottom:4px;">${c.icon}</div>
+        <div style="font-weight:700;font-size:13px;margin-bottom:4px;">${escapeHtml(c.name)}</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">${c.types.map(t => t.icon).join(' ')}</div>
+        <button onclick="openCaseUI('${c.id}', ${c.price})" style="background:var(--accent);color:#1a1205;border:none;padding:8px 14px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;width:100%;">${c.price} 💰</button>
+      </div>
+    `).join('');
+  } catch (e) {}
+}
+
+async function openCaseUI(caseId, price) {
+  if (!ME || (ME.coins || 0) < price) { alert('Недостаточно монет'); return; }
+  if (!confirm(`Открыть кейс за ${price} 💰?`)) return;
+  const r = await API.post('/api/cases/open', { case_id: caseId });
+  if (!r.ok) { alert(r.msg || 'Ошибка'); return; }
+  ME.coins = r.new_coins; renderTop();
+  hap(r.item.rarity === 'legendary' ? 'heavy' : 'success');
+  // Анимация выпадения
+  const rarityCss = {common:'#aaa', uncommon:'#22c55e', rare:'#3b82f6', epic:'#a855f7', legendary:'#eab308'};
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:5000;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="text-align:center;animation:scale-in 0.5s;">
+      <div style="font-size:72px;margin-bottom:10px;">${r.item.type_icon}</div>
+      <div style="font-size:22px;font-weight:800;color:${rarityCss[r.item.rarity] || '#fff'};margin-bottom:6px;">${r.rarity_icon} ${escapeHtml(r.item.name)}</div>
+      <div style="font-size:14px;color:var(--muted);">${escapeHtml(r.item.rarity_name)} • Буст +${r.item.boost_pct}%</div>
+      ${r.is_dupe ? '<div style="color:var(--warn);font-size:13px;margin-top:10px;">Дубликат — конвертирован в монеты</div>' : ''}
+      <button onclick="this.parentElement.parentElement.remove();loadCases();loadCollection();" style="margin-top:20px;padding:12px 28px;background:var(--accent);color:#1a1205;border:none;border-radius:10px;font-weight:800;cursor:pointer;">Отлично</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (r.item.rarity === 'legendary') playVictoryVfx('stars');
+  else if (r.item.rarity === 'epic') playVictoryVfx('confetti');
+}
+
+async function loadCollection() {
+  try {
+    const r = await API.get('/api/collection');
+    if (!r.authenticated) return;
+    $('collection-counter').textContent = `${r.owned_count} / ${r.total_items}`;
+    const catNames = {reaction:'🔴 Реакция',logic:'🟡 Логика',memory:'🟢 Память',coordination:'🔵 Координация',trivia:'🟣 Эрудиция'};
+    const rarityCss = {common:'#888',uncommon:'#22c55e',rare:'#3b82f6',epic:'#a855f7',legendary:'#eab308'};
+    let html = '';
+    for (const [cat, items] of Object.entries(r.categories || {})) {
+      html += `<div style="margin-bottom:14px;"><div style="font-weight:700;font-size:14px;margin-bottom:8px;">${catNames[cat] || cat}</div>`;
+      html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:6px;">`;
+      for (const item of items) {
+        const border = item.equipped ? 'var(--win)' : (item.owned ? rarityCss[item.rarity] : '#333');
+        const opacity = item.owned ? '1' : '0.25';
+        const handler = item.owned ? `onclick="equipCollectionItem('${item.id}')"` : '';
+        html += `<div ${handler} style="text-align:center;cursor:${item.owned ? 'pointer' : 'default'};opacity:${opacity};" title="${escapeHtml(item.name)} (${item.rarity_name})">
+          <div style="width:52px;height:52px;margin:0 auto;border-radius:10px;background:var(--panel2);border:2px solid ${border};display:flex;align-items:center;justify-content:center;font-size:24px;">${item.type_icon}</div>
+          <div style="font-size:9px;color:${rarityCss[item.rarity]};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px;">${item.level}</div>
+        </div>`;
+      }
+      html += '</div></div>';
+    }
+    $('collection-list').innerHTML = html;
+  } catch (e) {}
+}
+async function equipCollectionItem(id) {
+  const r = await API.post('/api/collection/equip', { item_id: id });
+  if (r.ok) { hap('tap'); loadCollection(); }
+}
+
+async function loadCategoryElo() {
+  if (!ME || !ME.category_elo) return;
+  const catInfo = [
+    {id:'reaction', name:'Реакция', icon:'🔴'},
+    {id:'logic', name:'Логика', icon:'🟡'},
+    {id:'memory', name:'Память', icon:'🟢'},
+    {id:'coordination', name:'Координация', icon:'🔵'},
+    {id:'trivia', name:'Эрудиция', icon:'🟣'},
+  ];
+  $('cat-elo').innerHTML = catInfo.map(c => {
+    const elo = Math.round(ME.category_elo[c.id] || 1000);
+    const l = getLeague(elo);
+    return `<div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
+      <div style="font-size:24px;margin-bottom:4px;">${c.icon}</div>
+      <div style="font-weight:700;font-size:13px;">${c.name}</div>
+      <div style="font-size:18px;font-weight:800;color:${l.color};">${l.icon} ${elo}</div>
+    </div>`;
+  }).join('');
+}
+
+async function loadReferralInfo() {
+  try {
+    const info = await API.get('/api/referral_info');
+    if (!info.authenticated) return;
+    const origin = location.origin;
+    $('ref-link').value = `${origin}/?ref=${encodeURIComponent(info.my_nickname)}`;
+    $('ref-info').textContent = `Ты пригласил: ${info.invited_count} • бонус: ${info.bonus_per_invite}💰 за каждого`;
+  } catch (e) {}
+}
+
+function copyRefLink() {
+  const inp = $('ref-link');
+  inp.select(); inp.setSelectionRange(0, 9999);
+  try {
+    navigator.clipboard.writeText(inp.value);
+    const b = event.target;
+    const old = b.textContent; b.textContent = 'Готово!';
+    setTimeout(() => { b.textContent = old; }, 1500);
+  } catch (e) {
+    document.execCommand('copy');
+  }
+}
+
+async function tryApplyReferrer() {
+  const params = new URLSearchParams(location.search);
+  const ref = params.get('ref');
+  if (!ref || !ME) return;
+  // Не привязываем если это сам себе
+  if (ref === ME.nickname) return;
+  try {
+    const r = await API.post('/api/attach_referrer', { ref_nickname: ref });
+    if (r.ok) {
+      // Обновим ME
+      const me = await API.get('/api/me');
+      if (me.authenticated) {
+        ME = me; renderTop(); renderLobby();
+      }
+      // Тост
+      const t = document.createElement('div');
+      t.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#26d67f;color:#0e0f13;padding:12px 22px;border-radius:20px;font-weight:700;z-index:1000;box-shadow:0 8px 24px rgba(0,0,0,0.3);';
+      t.textContent = `🎁 +${r.bonus} 💰 за переход по ссылке друга!`;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 4000);
+    }
+  } catch (e) {}
+  // Убираем ?ref из URL, чтобы не тригерилось повторно
+  try {
+    history.replaceState(null, '', location.pathname);
+  } catch (e) {}
+}
+
+async function loadLeaderboard() {
+  try {
+    const rows = await API.get('/api/leaderboard?limit=20');
+    if (Array.isArray(rows)) {
+      $('lb-body').innerHTML = rows.map(r => `
+        <tr>
+          <td class="lb-rank">#${r.rank}</td>
+          <td>${escapeHtml(r.nickname)} ${leagueBadge(r.elo)}</td>
+          <td style="text-align: right; font-weight: 700;">${Math.round(r.elo)}</td>
+          <td style="text-align: right; color: var(--muted);">${r.wins}/${r.losses}</td>
+        </tr>
+      `).join('');
+      if (rows.length === 0) {
+        $('lb-body').innerHTML = '<tr><td colspan="4" style="color: var(--muted); padding: 20px; text-align: center;">Лидерборд пуст — будь первым!</td></tr>';
+      }
+    }
+  } catch (e) {}
+}
+
+function escapeHtml(s) {
+  return (s || '').toString().replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[c]);
+}
+
+// Лиги по ELO — визуальные бейджи
+const LEAGUES = [
+  { min: 0,    name: 'Bronze',       color: '#b08a55', icon: '🥉' },
+  { min: 900,  name: 'Silver',       color: '#b8c2cc', icon: '🥈' },
+  { min: 1000, name: 'Gold',         color: '#ffcc40', icon: '🥇' },
+  { min: 1150, name: 'Platinum',     color: '#7dd3fc', icon: '💎' },
+  { min: 1300, name: 'Diamond',      color: '#a78bfa', icon: '💠' },
+  { min: 1500, name: 'Master',       color: '#f472b6', icon: '🏆' },
+  { min: 1700, name: 'Grandmaster',  color: '#ff7a29', icon: '👑' },
+];
+
+function getLeague(elo) {
+  let cur = LEAGUES[0];
+  for (const l of LEAGUES) if (elo >= l.min) cur = l;
+  return cur;
+}
+
+function leagueBadge(elo) {
+  const l = getLeague(elo);
+  return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:${l.color}22;color:${l.color};font-size:11px;font-weight:700;">${l.icon} ${l.name}</span>`;
+}
+
+// ═════════════════════════════════════════════════════════════
+//   Auth
+// ═════════════════════════════════════════════════════════════
+async function doLogin() {
+  const nick = $('auth-nick').value.trim();
+  const pass = $('auth-pass').value;
+  $('auth-err').textContent = '';
+  if (!nick || !pass) {
+    $('auth-err').textContent = 'Введи никнейм и пароль';
+    return;
+  }
+  const r = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nickname: nick, password: pass }),
+  });
+  const data = await r.json();
+  if (!r.ok) {
+    $('auth-err').textContent = data.detail || 'Ошибка входа';
+    return;
+  }
+  API.setToken(data.token);
+  boot();
+}
+
+// ═════════════════════════════════════════════════════════════
+//   Stake selection
+// ═════════════════════════════════════════════════════════════
+document.querySelectorAll('.stake-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.stake-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    currentStake = parseInt(btn.dataset.stake, 10);
+    $('stake-custom').value = '';
+  });
+});
+$('stake-custom').addEventListener('input', (e) => {
+  const v = parseInt(e.target.value, 10);
+  if (!isNaN(v) && v >= 0 && v <= 1000) {
+    currentStake = v;
+    document.querySelectorAll('.stake-btn').forEach(b => b.classList.remove('selected'));
+  }
+});
+
+// ═════════════════════════════════════════════════════════════
+//   Matchmaking
+// ═════════════════════════════════════════════════════════════
+function createCustomRoom() {
+  if (!ME) return;
+  showScreen('queue');
+  $('queue-stake').textContent = '—';
+  $('queue-time').textContent = '0';
+  queueStartTs = Date.now();
+  queueTimer = setInterval(() => {
+    $('queue-time').textContent = Math.floor((Date.now() - queueStartTs) / 1000);
+  }, 500);
+  const qh = document.querySelector('#screen-queue h2');
+  if (qh) qh.textContent = 'Создаём комнату...';
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const url = proto + location.host + '/ws/queue?token=' + encodeURIComponent(API.token());
+  ws = new WebSocket(url);
+  ws.onopen = () => ws.send(JSON.stringify({ type: 'create_room' }));
+  ws.onmessage = (e) => {
+    let msg = null; try { msg = JSON.parse(e.data); } catch (_) { return; }
+    if (msg.type === 'room_created') {
+      showRoomCreated(msg.code);
+    } else if (msg.type === 'room_expired') {
+      alert('Никто не присоединился за 5 минут');
+      goLobby();
+    } else {
+      handleServerMsg(msg);
+    }
+  };
+  ws.onclose = handleWsCloseMaybeRejoin;
+}
+
+function showRoomCreated(code) {
+  clearInterval(queueTimer);
+  const link = `${location.origin}/?room=${code}`;
+  const qh = document.querySelector('#screen-queue h2');
+  if (qh) qh.textContent = 'Твоя комната: ' + code;
+  const wait = document.querySelector('#screen-queue .wait-time');
+  if (wait) wait.innerHTML = `
+    <div style="margin: 16px auto; max-width: 340px;">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;font-family:'JetBrains Mono',monospace;font-size:14px;word-break:break-all;">${escapeHtml(link)}</div>
+      <button class="stake-btn selected" style="width:100%;margin-bottom:8px;" onclick="copyRoomLink('${escapeHtml(link)}')">📋 Скопировать ссылку</button>
+      <button class="stake-btn selected" style="width:100%;background:linear-gradient(90deg,#26d67f,#7fe3b0);color:#0e0f13;" onclick="shareRoomLink('${escapeHtml(link)}', '${escapeHtml(code)}')">📤 Поделиться</button>
+      <div style="margin-top:14px;color:var(--muted);font-size:12px;">Жду соперника...</div>
+    </div>
+  `;
+}
+
+async function copyRoomLink(link) {
+  try {
+    await navigator.clipboard.writeText(link);
+    hap('success');
+    alert('Ссылка скопирована!');
+  } catch (e) {}
+}
+async function shareRoomLink(link, code) {
+  const text = `Го 1v1 в Reflex Arena! Код: ${code}`;
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Reflex Arena', text, url: link });
+      hap('tap');
+      return;
+    } catch (e) {}
+  }
+  copyRoomLink(link);
+}
+
+async function tryAutoJoinRoom() {
+  const params = new URLSearchParams(location.search);
+  const code = params.get('room');
+  if (!code || !ME) return false;
+  // Очищаем URL
+  try { history.replaceState(null, '', location.pathname); } catch (e) {}
+  showScreen('queue');
+  $('queue-stake').textContent = '—';
+  $('queue-time').textContent = '0';
+  queueStartTs = Date.now();
+  queueTimer = setInterval(() => {
+    $('queue-time').textContent = Math.floor((Date.now() - queueStartTs) / 1000);
+  }, 500);
+  const qh = document.querySelector('#screen-queue h2');
+  if (qh) qh.textContent = `Присоединяемся к комнате ${code}...`;
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const url = proto + location.host + '/ws/queue?token=' + encodeURIComponent(API.token());
+  ws = new WebSocket(url);
+  ws.onopen = () => ws.send(JSON.stringify({ type: 'join_room', code: code.toUpperCase() }));
+  ws.onmessage = (e) => { try { handleServerMsg(JSON.parse(e.data)); } catch (err) { console.error(err); } };
+  ws.onclose = handleWsCloseMaybeRejoin;
+  return true;
+}
+
+function findDeathmatch() {
+  if (!ME) return;
+  const stake = Math.max(200, currentStake);
+  if (stake > (ME.coins || 0)) {
+    alert('Нужно минимум 200 💰 для Deathmatch');
+    return;
+  }
+  showScreen('queue');
+  $('queue-stake').textContent = stake + ' 💀';
+  $('queue-time').textContent = '0';
+  queueStartTs = Date.now();
+  queueTimer = setInterval(() => {
+    $('queue-time').textContent = Math.floor((Date.now() - queueStartTs) / 1000);
+  }, 500);
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const url = proto + location.host + '/ws/queue?token=' + encodeURIComponent(API.token());
+  ws = new WebSocket(url);
+  ws.onopen = () => ws.send(JSON.stringify({ type: 'queue', stake_coins: stake, mode: 'deathmatch' }));
+  ws.onmessage = (e) => { try { handleServerMsg(JSON.parse(e.data)); } catch (err) {} };
+  ws.onclose = handleWsCloseMaybeRejoin;
+}
+
+function playVsAi(difficulty) {
+  if (!ME) return;
+  showScreen('queue');
+  $('queue-stake').textContent = '0 (практика)';
+  $('queue-time').textContent = '0';
+  queueStartTs = Date.now();
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const url = proto + location.host + '/ws/queue?token=' + encodeURIComponent(API.token());
+  ws = new WebSocket(url);
+  ws.onopen = () => ws.send(JSON.stringify({ type: 'vs_ai', difficulty }));
+  ws.onmessage = (e) => { try { handleServerMsg(JSON.parse(e.data)); } catch (err) { console.error(err); } };
+  ws.onclose = () => {};
+}
+
+function findMatch() {
+  if (!ME) return;
+  if (currentStake > (ME.coins || 0)) {
+    alert('Недостаточно монет для этой ставки');
+    return;
+  }
+  showScreen('queue');
+  $('queue-stake').textContent = currentStake;
+  $('queue-time').textContent = '0';
+  queueStartTs = Date.now();
+  queueTimer = setInterval(() => {
+    $('queue-time').textContent = Math.floor((Date.now() - queueStartTs) / 1000);
+  }, 500);
+
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const url = proto + location.host + '/ws/queue?token=' + encodeURIComponent(API.token());
+  ws = new WebSocket(url);
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: 'queue', stake_coins: currentStake }));
+  };
+  ws.onmessage = (e) => {
+    try { handleServerMsg(JSON.parse(e.data)); } catch (err) { console.error(err); }
+  };
+  ws.onclose = () => {
+    clearInterval(queueTimer);
+    if ($('screen-match').classList.contains('active') && !matchIsFinished()) {
+      // Неожиданный close в матче — пытаемся реконнектиться
+      setTimeout(() => tryRejoin(), 500);
+      return;
+    }
+    if ($('screen-queue').classList.contains('active')) {
+      alert('Соединение разорвано');
+      goLobby();
+    }
+  };
+  ws.onerror = () => {};
+}
+
+function cancelQueue() {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'cancel' }));
+  }
+  clearInterval(queueTimer);
+  try { ws && ws.close(); } catch(e) {}
+  goLobby();
+}
+
+async function goLobby() {
+  clearInterval(queueTimer);
+  cleanupGame();
+  // Refresh stats
+  const me = await API.get('/api/me');
+  if (me.authenticated) {
+    ME = me;
+    renderTop();
+    renderLobby();
+    loadLeaderboard();
+  }
+  showScreen('lobby');
+}
+
+// ═════════════════════════════════════════════════════════════
+//   Match flow
+// ═════════════════════════════════════════════════════════════
+let MATCH = null;  // { role, opponent, you, stake, games_preview }
+let currentGame = null;   // instance
+
+function handleServerMsg(msg) {
+  switch (msg.type) {
+    case 'queued':
+      // Сервер подтвердил очередь — ничего не делаем
+      break;
+    case 'matched':
+      onMatched(msg);
+      break;
+    case 'round_start':
+      onRoundStart(msg);
+      break;
+    case 'opponent_finished':
+      onOpponentFinished(msg);
+      break;
+    case 'round_result':
+      onRoundResult(msg);
+      break;
+    case 'match_finished':
+      onMatchFinished(msg);
+      break;
+    case 'timeout':
+      alert('Не нашли соперника. Попробуй позже или измени ставку.');
+      goLobby();
+      break;
+    case 'cancelled':
+      goLobby();
+      break;
+    case 'opponent_disconnected':
+      showDcBanner(msg.grace_seconds || 15);
+      break;
+    case 'opponent_reconnected':
+      hideDcBanner();
+      break;
+    case 'emote':
+      showEmoteFromOpponent(msg.code);
+      break;
+    case 'already_in_match':
+      alert('Ты уже в активном матче — попробуй обновить страницу.');
+      goLobby();
+      break;
+    case 'error':
+      alert('Ошибка: ' + msg.msg);
+      goLobby();
+      break;
+  }
+}
+
+// ─── Эмоуты ───
+const EMOTES = [
+  { code: 'gg',   emoji: '🤝' },
+  { code: 'fire', emoji: '🔥' },
+  { code: 'skull',emoji: '💀' },
+  { code: 'laugh',emoji: '😂' },
+  { code: 'thumb',emoji: '👍' },
+  { code: 'wp',   emoji: '🎉' },
+  { code: 'think',emoji: '🤔' },
+  { code: 'rage', emoji: '😤' },
+  { code: 'sleep',emoji: '😴' },
+  { code: 'crown',emoji: '👑' },
+];
+function renderEmotePanel() {
+  const p = $('emote-panel');
+  if (!p) return;
+  p.innerHTML = EMOTES.map(e =>
+    `<button onclick="sendEmote('${e.code}')" title="${e.code}">${e.emoji}</button>`
+  ).join('');
+}
+function toggleEmotePanel() {
+  const p = $('emote-panel');
+  if (!p) return;
+  if (p.classList.contains('hidden')) {
+    renderEmotePanel();
+    p.classList.remove('hidden');
+    hap('tap');
+  } else {
+    p.classList.add('hidden');
+  }
+}
+function sendEmote(code) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'emote', code }));
+  }
+  // Показываем у себя над своим счётом
+  showEmoteAtElement(code, 'me');
+  const panel = $('emote-panel');
+  if (panel) panel.classList.add('hidden');
+  hap('tap');
+}
+function showEmoteFromOpponent(code) {
+  showEmoteAtElement(code, 'opp');
+  hap('heavy');
+}
+function showEmoteAtElement(code, who) {
+  const emote = EMOTES.find(e => e.code === code) || { emoji: '❔' };
+  // who: 'me' — над моим счётом, 'opp' — над оппонентом
+  const p1IsMe = MATCH && MATCH.role === 'p1';
+  const targetId = (who === 'me')
+    ? (p1IsMe ? 'p1-score' : 'p2-score')
+    : (p1IsMe ? 'p2-score' : 'p1-score');
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  const rect = el.getBoundingClientRect();
+  const bubble = document.createElement('div');
+  bubble.className = 'emote-bubble';
+  bubble.textContent = emote.emoji;
+  bubble.style.left = (rect.left + rect.width / 2) + 'px';
+  bubble.style.top  = (rect.top - 8) + 'px';
+  document.body.appendChild(bubble);
+  setTimeout(() => bubble.remove(), 2600);
+}
+
+function showDcBanner(secs) {
+  let b = document.getElementById('dc-banner');
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'dc-banner';
+    b.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(255,77,109,0.95);color:white;padding:10px 18px;border-radius:20px;font-weight:700;z-index:1000;font-size:13px;';
+    document.body.appendChild(b);
+  }
+  let left = secs;
+  b.textContent = `⚠️ Соперник отключился • ${left}с на реконнект`;
+  clearInterval(window._dcTimer);
+  window._dcTimer = setInterval(() => {
+    left--;
+    if (left <= 0) { hideDcBanner(); return; }
+    b.textContent = `⚠️ Соперник отключился • ${left}с на реконнект`;
+  }, 1000);
+}
+function hideDcBanner() {
+  const b = document.getElementById('dc-banner');
+  if (b) b.remove();
+  clearInterval(window._dcTimer);
+}
+
+function onMatched(msg) {
+  clearInterval(queueTimer);
+  MATCH = msg;
+  showScreen('match');
+  // Рендер header
+  const you = msg.you || {};
+  const opp = msg.opponent || {};
+  const leftRole = msg.role;        // ты — p1 или p2
+  const p1IsMe = leftRole === 'p1';
+  const left = p1IsMe ? you : opp;
+  const right = p1IsMe ? opp : you;
+  $('p1-name').textContent = left.nickname || '?';
+  $('p1-elo').textContent = 'ELO ' + (left.elo ?? '—');
+  $('p2-name').textContent = right.nickname || '?';
+  $('p2-elo').textContent = 'ELO ' + (right.elo ?? '—');
+  $('p1-score').textContent = '0';
+  $('p2-score').textContent = '0';
+  $('match-stake').textContent = msg.stake > 0 ? `Банк: ${msg.stake * 2} 💰` : 'Бесплатный';
+  // Round progress
+  renderRoundProgress({p1: 0, p2: 0}, 0);
+  $('game-area').innerHTML = `
+    <div class="game-intro">
+      <div style="font-size: 48px;">⚔️</div>
+      <div style="font-size: 20px; margin-top: 10px;">Соперник найден!</div>
+      <div style="color: var(--muted); margin-top: 8px;">Готовься...</div>
+    </div>
+  `;
+}
+
+function renderRoundProgress(won, currentRound) {
+  const total = MATCH.best_of || 5;
+  const p1Won = won.p1 || 0;
+  const p2Won = won.p2 || 0;
+  const html = [];
+  for (let i = 0; i < total; i++) {
+    let cls = 'round-dot';
+    if (i < p1Won) cls += ' p1-won';
+    else if (i < p1Won + p2Won) cls += ' p2-won';
+    else if (i === currentRound) cls += ' current';
+    html.push(`<div class="${cls}"></div>`);
+  }
+  $('round-progress').innerHTML = html.join('');
+}
+
+function onRoundStart(msg) {
+  $('match-round').textContent = `Раунд ${msg.round_num} / ${msg.total_rounds}`;
+  const w = msg.rounds_won || { p1: 0, p2: 0 };
+  const p1IsMe = MATCH.role === 'p1';
+  $('p1-score').textContent = w.p1;
+  $('p2-score').textContent = w.p2;
+  renderRoundProgress(w, msg.round_num - 1);
+
+  cleanupGame();
+  // Показываем интро + 3..2..1
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="game-intro" id="intro">
+      <div class="game-name">${escapeHtml(msg.game_name)}</div>
+      <div class="game-desc">${escapeHtml(msg.game_desc)}</div>
+      <div class="countdown" id="cd">3</div>
+    </div>
+  `;
+  let left = 3;
+  const tick = () => {
+    left--;
+    if (left <= 0) {
+      startMiniGame(msg.game);
+    } else {
+      $('cd').textContent = left;
+      setTimeout(tick, 1000);
+    }
+  };
+  setTimeout(tick, 1000);
+}
+
+function onOpponentFinished(msg) {
+  // Показываем хинт внутри игры если она ещё идёт
+  const hint = document.createElement('div');
+  hint.style.cssText = 'position:absolute;top:12px;right:12px;background:rgba(255,77,109,0.85);padding:6px 12px;border-radius:20px;font-size:12px;font-weight:700;z-index:5;';
+  hint.textContent = `Соперник: ${msg.opponent_score}`;
+  hint.id = 'opp-score-hint';
+  const prev = document.getElementById('opp-score-hint');
+  if (prev) prev.remove();
+  $('game-area').appendChild(hint);
+}
+
+function onRoundResult(msg) {
+  cleanupGame();
+  const p1IsMe = MATCH.role === 'p1';
+  const myScore = p1IsMe ? msg.p1_score : msg.p2_score;
+  const oppScore = p1IsMe ? msg.p2_score : msg.p1_score;
+  let verdict = 'draw', vClass = 'draw', text = 'Ничья';
+  if ((msg.winner === 'p1' && p1IsMe) || (msg.winner === 'p2' && !p1IsMe)) {
+    verdict = 'win'; vClass = 'win'; text = 'Победа!';
+  } else if (msg.winner !== 'draw') {
+    verdict = 'lose'; vClass = 'lose'; text = 'Поражение';
+  }
+  $('p1-score').textContent = msg.rounds_won.p1;
+  $('p2-score').textContent = msg.rounds_won.p2;
+
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="round-result-overlay">
+      <div class="verdict ${vClass}">${text}</div>
+      <div class="scores">
+        <div class="me">Ты: ${myScore}</div>
+        <div class="opp">Соперник: ${oppScore}</div>
+      </div>
+      <div class="next">Следующий раунд через 3 сек...</div>
+    </div>
+  `;
+}
+
+function onMatchFinished(msg) {
+  cleanupGame();
+  const won = msg.you_won;
+  $('fin-title').textContent = won ? 'Ты победил!' : (msg.winner === null ? 'Ничья' : 'Поражение');
+  $('fin-title').className = won ? 'won' : 'lost';
+  $('fin-emoji').textContent = won ? '🏆' : (msg.winner === null ? '🤝' : '💀');
+  const w = msg.rounds_won || {p1: 0, p2: 0};
+  const p1IsMe = MATCH.role === 'p1';
+  const myRounds = p1IsMe ? w.p1 : w.p2;
+  const oppRounds = p1IsMe ? w.p2 : w.p1;
+  $('fin-score').textContent = `${myRounds} : ${oppRounds}`;
+  let reward = '';
+  const you = msg.you || {};
+  if (won) {
+    reward = `+${msg.pot || 0} 💰 (банк) + 20 💰 бонус • ELO ${you.elo_delta >= 0 ? '+' : ''}${you.elo_delta}`;
+  } else if (msg.winner === null) {
+    reward = `Ставка возвращена • ELO ${you.elo_delta >= 0 ? '+' : ''}${you.elo_delta}`;
+  } else {
+    reward = `Ставка ушла сопернику • ELO ${you.elo_delta >= 0 ? '+' : ''}${you.elo_delta}`;
+  }
+  $('fin-reward').textContent = reward;
+  // Сохраняем для шеринга
+  LAST_FINISHED = {
+    won,
+    myNick: (MATCH.you && MATCH.you.nickname) || (ME && ME.nickname) || '?',
+    oppNick: (MATCH.opponent && MATCH.opponent.nickname) || '?',
+    myScore: myRounds,
+    oppScore: oppRounds,
+    eloDelta: (you.elo_delta || 0),
+  };
+  if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+  showScreen('finished');
+  // VFX при победе
+  if (won) {
+    // Экипированный эффект загружаем из shop/vfx
+    API.get('/api/shop/vfx').then(r => {
+      const eq = (r.vfx || []).find(v => v.equipped);
+      if (eq) playVictoryVfx(eq.id);
+      else playVictoryVfx('confetti');  // дефолт для всех
+    }).catch(() => playVictoryVfx('confetti'));
+  }
+}
+
+function cleanupGame() {
+  if (currentGame && typeof currentGame.cleanup === 'function') {
+    try { currentGame.cleanup(); } catch(e) {}
+  }
+  currentGame = null;
+}
+
+function sendResult(score, elapsedMs) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'result',
+      score: Math.max(0, Math.floor(score)),
+      elapsed_ms: Math.max(0, Math.floor(elapsedMs)),
+    }));
+  }
+}
+
+// ═════════════════════════════════════════════════════════════
+//   Mini-games
+// ═════════════════════════════════════════════════════════════
+function startMiniGame(gameId) {
+  if (gameId === 'react') currentGame = startReactGame();
+  else if (gameId === 'aim') currentGame = startAimGame();
+  else if (gameId === 'sequence') currentGame = startSequenceGame();
+  else if (gameId === 'math') currentGame = startMathGame();
+  else if (gameId === 'odd') currentGame = startOddGame();
+  else if (gameId === 'typing') currentGame = startTypingGame();
+  else if (gameId === 'stroop') currentGame = startStroopGame();
+  else if (gameId === 'memory') currentGame = startMemoryGame();
+  else if (gameId === 'spatial') currentGame = startSpatialGame();
+  else if (gameId === 'audio') currentGame = startAudioGame();
+  else if (gameId === 'rhythm') currentGame = startRhythmGame();
+  else if (gameId === 'balance') currentGame = startBalanceGame();
+  else if (gameId === 'quick_draw') currentGame = startQuickDrawGame();
+  else if (gameId === 'number_chain') currentGame = startNumberChainGame();
+  else if (gameId === 'visual_memory') currentGame = startVisualMemoryGame();
+  else if (gameId === 'word_memory') currentGame = startWordMemoryGame();
+  else if (gameId === 'trivia_geo') currentGame = startTriviaGame('geo');
+  else if (gameId === 'trivia_science') currentGame = startTriviaGame('science');
+  else if (gameId === 'trivia_history') currentGame = startTriviaGame('history');
+  else if (gameId === 'trivia_pop') currentGame = startTriviaGame('pop');
+  else {
+    // Неизвестная игра — возможно, старый кэш браузера. Показываем подсказку.
+    console.error('Unknown mini-game:', gameId);
+    $('game-area').innerHTML = `
+      <div class="game-intro" style="color:#ff4d6d">
+        <div class="game-name">Мини-игра "${escapeHtml(gameId)}" не найдена</div>
+        <div class="game-desc">Обнови страницу (Cmd+Shift+R / Ctrl+F5) — скорее всего, браузер кэширует старую версию.</div>
+      </div>`;
+    // Всё равно шлём результат чтобы не залипнуть
+    setTimeout(() => sendResult(0, 5000), 1000);
+  }
+}
+
+// ─── React ───
+function startReactGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="react-area wait" id="react">
+      <div class="big">Жди...</div>
+      <div class="small">Кликни, как только экран станет <b style="color:#4aff7a;">зелёным</b>.</div>
+      <div class="react-progress">Попытка <span id="ra-n">1</span> / 5</div>
+      <div class="react-attempts" id="ra-list"></div>
+    </div>
+  `;
+  const el = $('react');
+  const ATTEMPTS = 5;
+  let attempt = 0;
+  let attempts = [];
+  const t0 = performance.now();
+  let waitingForClick = false;
+  let timerId = null;
+  let showTs = 0;
+
+  function scheduleNext() {
+    attempt++;
+    if (attempt > ATTEMPTS) {
+      finish();
+      return;
+    }
+    $('ra-n').textContent = attempt;
+    el.classList.remove('go', 'early');
+    el.classList.add('wait');
+    el.querySelector('.big').textContent = 'Жди...';
+    waitingForClick = false;
+    const delay = 900 + Math.random() * 2600;
+    timerId = setTimeout(() => {
+      el.classList.remove('wait');
+      el.classList.add('go');
+      el.querySelector('.big').textContent = 'КЛИК!';
+      showTs = performance.now();
+      waitingForClick = true;
+    }, delay);
+  }
+
+  function onClick() {
+    if (!waitingForClick && el.classList.contains('wait')) {
+      hap('error');
+      clearTimeout(timerId);
+      el.classList.remove('wait', 'go');
+      el.classList.add('early');
+      el.querySelector('.big').textContent = 'Рано! +500мс';
+      attempts.push(500);
+      renderList();
+      setTimeout(() => scheduleNext(), 600);
+      return;
+    }
+    if (waitingForClick) {
+      hap('success');
+      const rt = performance.now() - showTs;
+      attempts.push(rt);
+      waitingForClick = false;
+      el.classList.remove('go');
+      el.classList.add('wait');
+      el.querySelector('.big').textContent = Math.round(rt) + ' мс';
+      renderList();
+      setTimeout(() => scheduleNext(), 600);
+    }
+  }
+
+  function renderList() {
+    $('ra-list').textContent = attempts.map(a => Math.round(a) + 'мс').join(' • ');
+  }
+
+  function finish() {
+    // Score: sum(max(0, 500 - rt)) * 2  →  очень быстрая реакция 200мс = 600 очков за попытку
+    let s = 0;
+    for (const rt of attempts) {
+      s += Math.max(0, 500 - Math.min(rt, 500)) * 2;
+    }
+    const elapsed = performance.now() - t0;
+    sendResult(s, elapsed);
+    el.querySelector('.big').textContent = 'Готово! ' + Math.round(s);
+    el.querySelector('.small').textContent = 'Ждём результат соперника...';
+  }
+
+  el.addEventListener('click', onClick);
+  scheduleNext();
+
+  return {
+    cleanup: () => {
+      clearTimeout(timerId);
+      el.removeEventListener('click', onClick);
+    }
+  };
+}
+
+// ─── Aim ───
+function startAimGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="aim-area" id="aim">
+      <div class="aim-hud">🎯 <span id="aim-hits">0</span> попаданий • <span id="aim-time">15.0</span>s</div>
+    </div>
+  `;
+  const el = $('aim');
+  const DURATION = 15000;
+  const t0 = performance.now();
+  let hits = 0;
+  let target = null;
+  let targetHitHandler = null;
+  let finished = false;
+  let rafId = null;
+
+  function spawn() {
+    if (finished) return;
+    if (target) target.remove();
+    const rect = el.getBoundingClientRect();
+    // Fallback на случай если rect ещё не рассчитан браузером
+    const W = rect.width > 100 ? rect.width : (window.innerWidth || 400);
+    const H = rect.height > 100 ? rect.height : Math.max(240, (window.innerHeight || 500) - 200);
+    // Если по какой-то причине размеры всё ещё крошечные — retry через rAF
+    if (W < 100 || H < 100) {
+      requestAnimationFrame(() => spawn());
+      return;
+    }
+    const margin = 50;
+    const x = margin + Math.random() * Math.max(10, W - 2 * margin);
+    const y = margin + Math.random() * Math.max(10, H - 2 * margin);
+    const t = document.createElement('div');
+    t.className = 'aim-target';
+    t.style.left = x + 'px';
+    t.style.top = y + 'px';
+    t.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      hap('tap');
+      hits++;
+      $('aim-hits').textContent = hits;
+      t.classList.add('hit');
+      setTimeout(() => t.remove(), 200);
+      target = null;
+      spawn();
+    });
+    el.appendChild(t);
+    target = t;
+  }
+
+  // Клик мимо тоже что-то значит — но не штрафуем в MVP, просто игнор
+  const loop = () => {
+    if (finished) return;
+    const elapsed = performance.now() - t0;
+    const left = Math.max(0, DURATION - elapsed);
+    $('aim-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      if (target) target.remove();
+      const score = hits * 100;
+      const elapsedMs = performance.now() - t0;
+      sendResult(score, elapsedMs);
+      el.innerHTML = `
+        <div style="color: white; text-align: center;">
+          <div style="font-size: 48px; font-weight: 800;">${hits} попаданий</div>
+          <div style="color: var(--muted); margin-top: 10px;">Ждём соперника...</div>
+        </div>
+      `;
+      return;
+    }
+    rafId = requestAnimationFrame(loop);
+  };
+  spawn();
+  rafId = requestAnimationFrame(loop);
+
+  return {
+    cleanup: () => {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      if (target) target.remove();
+    }
+  };
+}
+
+// ─── Sequence ───
+function startSequenceGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="seq-area" id="seq">
+      <div class="seq-status" id="seq-status">Запоминай...</div>
+      <div class="seq-len">Длина: <span id="seq-len">1</span></div>
+      <div class="seq-board">
+        <button class="seq-btn red" data-color="red" disabled></button>
+        <button class="seq-btn blue" data-color="blue" disabled></button>
+        <button class="seq-btn green" data-color="green" disabled></button>
+        <button class="seq-btn yellow" data-color="yellow" disabled></button>
+      </div>
+    </div>
+  `;
+  const el = $('seq');
+  const btns = el.querySelectorAll('.seq-btn');
+  const COLORS = ['red', 'blue', 'green', 'yellow'];
+  const MAX_DURATION = 45000;  // жёсткий таймаут — если не играешь, раунд закончится
+  const t0 = performance.now();
+  let sequence = [];
+  let userIdx = 0;
+  let playing = false;
+  let maxLen = 0;
+  let finished = false;
+  let handlers = [];
+  // Fallback-таймер: если через 45 сек игрок ни разу не завершил — всё равно финишим
+  const hardTimer = setTimeout(() => {
+    if (!finished) {
+      finish();
+    }
+  }, MAX_DURATION);
+
+  function addToSequence() {
+    sequence.push(COLORS[Math.floor(Math.random() * 4)]);
+  }
+
+  function disableBtns(v) {
+    btns.forEach(b => {
+      b.disabled = v;
+      b.classList.toggle('disabled', v);
+    });
+  }
+
+  async function playSequence() {
+    disableBtns(true);
+    $('seq-status').textContent = 'Запоминай...';
+    $('seq-len').textContent = sequence.length;
+    await sleep(500);
+    const delay = Math.max(220, 600 - sequence.length * 20);
+    for (const c of sequence) {
+      const btn = el.querySelector('.seq-btn.' + c);
+      btn.classList.add('active');
+      await sleep(delay);
+      btn.classList.remove('active');
+      await sleep(120);
+      if (finished) return;
+    }
+    $('seq-status').textContent = 'Повтори последовательность';
+    userIdx = 0;
+    playing = true;
+    disableBtns(false);
+  }
+
+  function onBtn(e) {
+    if (!playing || finished) return;
+    const color = e.currentTarget.dataset.color;
+    const btn = e.currentTarget;
+    btn.classList.add('active');
+    setTimeout(() => btn.classList.remove('active'), 120);
+    const expected = sequence[userIdx];
+    if (color !== expected) {
+      // Ошибка — финиш
+      finish();
+      return;
+    }
+    userIdx++;
+    if (userIdx >= sequence.length) {
+      // Успех — добавляем элемент
+      playing = false;
+      maxLen = sequence.length;
+      const elapsed = performance.now() - t0;
+      if (elapsed > MAX_DURATION) {
+        finish();
+        return;
+      }
+      addToSequence();
+      setTimeout(() => playSequence(), 500);
+    }
+  }
+
+  btns.forEach(b => {
+    const h = onBtn;
+    b.addEventListener('click', h);
+    handlers.push([b, h]);
+  });
+
+  function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+  }
+
+  function finish() {
+    if (finished) return;
+    finished = true;
+    playing = false;
+    disableBtns(true);
+    const score = maxLen * 100;
+    const elapsed = performance.now() - t0;
+    sendResult(score, elapsed);
+    $('seq-status').textContent = `Ошибка! Лучшая длина: ${maxLen}`;
+  }
+
+  // Start
+  addToSequence();
+  playSequence();
+
+  return {
+    cleanup: () => {
+      finished = true;
+      clearTimeout(hardTimer);
+      handlers.forEach(([b, h]) => b.removeEventListener('click', h));
+    }
+  };
+}
+
+// ─── Math (устный счёт) ───
+function startMathGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="math-area" id="math">
+      <div class="math-hud">🧮 <span id="math-correct">0</span> верно • <span id="math-time">20.0</span>s</div>
+      <div class="math-expr" id="math-expr">—</div>
+      <div class="math-options" id="math-opts"></div>
+      <div class="math-stats"><span id="math-wrong">0</span> ошибок</div>
+    </div>
+  `;
+  const DURATION = 20000;
+  const t0 = performance.now();
+  let correct = 0, wrong = 0;
+  let currentAnswer = 0;
+  let finished = false;
+  let rafId = null;
+  let lockInputs = false;
+
+  function randInt(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
+
+  function nextProblem() {
+    const ops = ['+', '-', '×', '÷'];
+    const op = ops[Math.floor(Math.random() * ops.length)];
+    let a, b, ans, expr;
+    if (op === '+') {
+      a = randInt(11, 89); b = randInt(11, 89);
+      ans = a + b; expr = `${a} + ${b}`;
+    } else if (op === '-') {
+      a = randInt(30, 99); b = randInt(10, a - 1);
+      ans = a - b; expr = `${a} − ${b}`;
+    } else if (op === '×') {
+      a = randInt(3, 12); b = randInt(3, 12);
+      ans = a * b; expr = `${a} × ${b}`;
+    } else {
+      b = randInt(2, 9); ans = randInt(2, 12); a = b * ans;
+      expr = `${a} ÷ ${b}`;
+    }
+    currentAnswer = ans;
+    // 4 варианта: правильный + 3 близких неправильных
+    const opts = new Set([ans]);
+    while (opts.size < 4) {
+      const delta = randInt(-7, 7);
+      if (delta === 0) continue;
+      const v = ans + delta;
+      if (v > 0 && !opts.has(v)) opts.add(v);
+    }
+    const shuffled = [...opts].sort(() => Math.random() - 0.5);
+    $('math-expr').textContent = expr + ' = ?';
+    const optsEl = $('math-opts');
+    optsEl.innerHTML = '';
+    shuffled.forEach(v => {
+      const btn = document.createElement('button');
+      btn.className = 'math-opt';
+      btn.textContent = v;
+      btn.addEventListener('click', () => onAnswer(btn, v));
+      optsEl.appendChild(btn);
+    });
+    lockInputs = false;
+  }
+
+  function onAnswer(btn, v) {
+    if (finished || lockInputs) return;
+    lockInputs = true;
+    if (v === currentAnswer) {
+      correct++;
+      btn.classList.add('correct');
+      $('math-correct').textContent = correct;
+    } else {
+      wrong++;
+      btn.classList.add('wrong');
+      $('math-wrong').textContent = wrong;
+      // Подсветим правильный
+      $('math-opts').querySelectorAll('.math-opt').forEach(b => {
+        if (parseInt(b.textContent, 10) === currentAnswer) b.classList.add('correct');
+      });
+    }
+    setTimeout(() => { if (!finished) nextProblem(); }, 250);
+  }
+
+  const loop = () => {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (performance.now() - t0));
+    $('math-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      const score = correct * 200;
+      sendResult(score, performance.now() - t0);
+      $('math').innerHTML = `
+        <div style="text-align:center;color:white;">
+          <div style="font-size:56px;font-weight:800;">${correct}</div>
+          <div style="color:var(--muted);margin-top:6px;">правильных</div>
+          <div style="color:var(--muted);margin-top:20px;font-size:13px;">Ждём соперника...</div>
+        </div>
+      `;
+      return;
+    }
+    rafId = requestAnimationFrame(loop);
+  };
+  nextProblem();
+  rafId = requestAnimationFrame(loop);
+
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
+}
+
+// ─── Odd one out (найди отличающийся квадрат) ───
+function startOddGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="odd-area" id="odd">
+      <div class="odd-hud">🔍 <span id="odd-found">0</span> найдено • <span id="odd-time">20.0</span>s</div>
+      <div class="odd-grid" id="odd-grid"></div>
+    </div>
+  `;
+  const DURATION = 20000;
+  const t0 = performance.now();
+  let found = 0;
+  let finished = false;
+  let rafId = null;
+  let lockInputs = false;
+
+  function hexColor(h) {
+    // простой HSL→hex; S/L фиксированы, оттенок двигаем
+    function hsl(h, s, l) {
+      const a = s * Math.min(l, 1 - l);
+      const f = n => {
+        const k = (n + h / 30) % 12;
+        return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)))));
+      };
+      return [f(0), f(8), f(4)];
+    }
+    return hsl(h.hue, h.sat, h.lgt);
+  }
+
+  function rgb([r, g, b]) { return `rgb(${r},${g},${b})`; }
+
+  function newRound() {
+    // Сложность растёт со временем и количеством найденных
+    const elapsed = performance.now() - t0;
+    const progress = Math.min(1, (found / 15) + (elapsed / DURATION) * 0.3);
+    // Размер сетки: 3×3 → 4×4 → 5×5 → 6×6
+    const size = progress < 0.15 ? 3 : progress < 0.4 ? 4 : progress < 0.7 ? 5 : 6;
+    // Разница оттенков: в начале — заметная, к концу — еле видная
+    const diff = Math.max(3, Math.round(28 - progress * 22));
+
+    const hue = Math.random() * 360;
+    const base = { hue, sat: 0.55, lgt: 0.50 };
+    const odd  = { hue: (hue + diff) % 360, sat: 0.55, lgt: 0.50 };
+
+    const total = size * size;
+    const oddIdx = Math.floor(Math.random() * total);
+    const grid = $('odd-grid');
+    // Адаптивный размер ячейки
+    const cellMax = 80;
+    const cellMin = 42;
+    const cell = Math.max(cellMin, Math.min(cellMax, Math.round(400 / size)));
+    grid.style.gridTemplateColumns = `repeat(${size}, ${cell}px)`;
+    grid.innerHTML = '';
+    for (let i = 0; i < total; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'odd-cell';
+      btn.style.width = cell + 'px';
+      btn.style.height = cell + 'px';
+      btn.style.background = rgb(hexColor(i === oddIdx ? odd : base));
+      btn.addEventListener('click', () => onPick(btn, i === oddIdx));
+      grid.appendChild(btn);
+    }
+    lockInputs = false;
+  }
+
+  function onPick(btn, isOdd) {
+    if (finished || lockInputs) return;
+    lockInputs = true;
+    if (isOdd) {
+      found++;
+      $('odd-found').textContent = found;
+      setTimeout(() => { if (!finished) newRound(); }, 120);
+    } else {
+      btn.classList.add('odd-flash-wrong');
+      setTimeout(() => btn.classList.remove('odd-flash-wrong'), 300);
+      // штраф: небольшой лок, но не пересоздаём раунд
+      setTimeout(() => { lockInputs = false; }, 350);
+    }
+  }
+
+  const loop = () => {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (performance.now() - t0));
+    $('odd-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      const score = found * 200;
+      sendResult(score, performance.now() - t0);
+      $('odd').innerHTML = `
+        <div style="text-align:center;color:white;">
+          <div style="font-size:56px;font-weight:800;">${found}</div>
+          <div style="color:var(--muted);margin-top:6px;">найдено</div>
+          <div style="color:var(--muted);margin-top:20px;font-size:13px;">Ждём соперника...</div>
+        </div>
+      `;
+      return;
+    }
+    rafId = requestAnimationFrame(loop);
+  };
+  newRound();
+  rafId = requestAnimationFrame(loop);
+
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
+}
+
+// ─── Typing (скорость печати) ───
+const TYPING_WORDS = [
+  "реакция","скорость","победа","матч","игра","ставка","кнопка","экран",
+  "монета","турнир","рейтинг","чемпион","дуэль","арена","трофей","гонка",
+  "координация","фокус","мастер","вызов","рекорд","финал","удар","прицел",
+  "ловкость","натиск","лидер","круг","раунд","бонус","награда","стратегия",
+];
+
+function startTypingGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="typ-area" id="typ">
+      <div class="typ-hud">⌨️ <span id="typ-correct">0</span> слов • <span id="typ-time">20.0</span>s</div>
+      <div class="typ-word" id="typ-word"></div>
+      <input class="typ-input" id="typ-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+    </div>
+  `;
+  const DURATION = 20000;
+  const t0 = performance.now();
+  let correct = 0;
+  let currentWord = '';
+  let finished = false;
+  let rafId = null;
+
+  function pickWord() {
+    currentWord = TYPING_WORDS[Math.floor(Math.random() * TYPING_WORDS.length)];
+    renderWord('');
+    $('typ-input').value = '';
+    $('typ-input').classList.remove('wrong');
+  }
+
+  function renderWord(typed) {
+    const w = currentWord;
+    const el = $('typ-word');
+    let html = '';
+    for (let i = 0; i < w.length; i++) {
+      const ch = w[i];
+      if (i < typed.length) {
+        html += `<span class="${typed[i] === ch ? 'done' : 'wrong'}">${escapeHtml(ch)}</span>`;
+      } else if (i === typed.length) {
+        html += `<span class="cur">${escapeHtml(ch)}</span>`;
+      } else {
+        html += `<span class="todo">${escapeHtml(ch)}</span>`;
+      }
+    }
+    el.innerHTML = html;
+  }
+
+  const inp = $('typ-input');
+  inp.focus();
+  const onInput = () => {
+    const val = inp.value.trim().toLowerCase();
+    if (val === currentWord) {
+      correct++;
+      $('typ-correct').textContent = correct;
+      pickWord();
+    } else if (!currentWord.startsWith(val)) {
+      inp.classList.add('wrong');
+    } else {
+      inp.classList.remove('wrong');
+      renderWord(val);
+    }
+  };
+  inp.addEventListener('input', onInput);
+
+  const loop = () => {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (performance.now() - t0));
+    $('typ-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      inp.removeEventListener('input', onInput);
+      inp.blur();
+      const score = correct * 300;  // 300 очков за слово
+      sendResult(score, performance.now() - t0);
+      $('typ').innerHTML = `
+        <div style="text-align:center;color:white;">
+          <div style="font-size:56px;font-weight:800;">${correct}</div>
+          <div style="color:var(--muted);margin-top:6px;">слов напечатано</div>
+          <div style="color:var(--muted);margin-top:20px;font-size:13px;">Ждём соперника...</div>
+        </div>
+      `;
+      return;
+    }
+    rafId = requestAnimationFrame(loop);
+  };
+  pickWord();
+  rafId = requestAnimationFrame(loop);
+
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); inp.removeEventListener('input', onInput); } };
+}
+
+// ─── Stroop (цвет vs слово) ───
+const STROOP_COLORS = [
+  { name: "КРАСНЫЙ", color: "#ff4a4a" },
+  { name: "СИНИЙ",   color: "#4a7dff" },
+  { name: "ЗЕЛЁНЫЙ", color: "#4aff7a" },
+  { name: "ЖЁЛТЫЙ",  color: "#ffd94a" },
+];
+
+function startStroopGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="stroop-area" id="stroop">
+      <div class="stroop-hud">🎨 <span id="stroop-correct">0</span> верно • <span id="stroop-time">20.0</span>s</div>
+      <div class="stroop-word" id="stroop-word">—</div>
+      <div class="stroop-opts" id="stroop-opts"></div>
+    </div>
+  `;
+  const DURATION = 20000;
+  const t0 = performance.now();
+  let correct = 0;
+  let currentColor = null;  // { name, color }
+  let finished = false;
+  let rafId = null;
+  let lock = false;
+
+  function next() {
+    // Выбираем слово и цвет — часто (70%) они РАЗНЫЕ (это ключевая механика Stroop)
+    const wordIdx = Math.floor(Math.random() * 4);
+    let colorIdx = Math.floor(Math.random() * 4);
+    if (Math.random() < 0.7 && colorIdx === wordIdx) {
+      colorIdx = (colorIdx + 1 + Math.floor(Math.random() * 3)) % 4;
+    }
+    const word = STROOP_COLORS[wordIdx];
+    const col = STROOP_COLORS[colorIdx];
+    currentColor = col;
+    const wordEl = $('stroop-word');
+    wordEl.textContent = word.name;
+    wordEl.style.color = col.color;
+
+    // 4 варианта кнопок — имена цветов, перемешаны
+    const opts = STROOP_COLORS.slice().sort(() => Math.random() - 0.5);
+    const optsEl = $('stroop-opts');
+    optsEl.innerHTML = '';
+    opts.forEach(c => {
+      const btn = document.createElement('button');
+      btn.className = 'stroop-opt';
+      btn.textContent = c.name;
+      btn.addEventListener('click', () => pick(btn, c));
+      optsEl.appendChild(btn);
+    });
+    lock = false;
+  }
+
+  function pick(btn, c) {
+    if (finished || lock) return;
+    lock = true;
+    if (c.name === currentColor.name) {
+      correct++;
+      $('stroop-correct').textContent = correct;
+      btn.classList.add('correct');
+      setTimeout(() => { if (!finished) next(); }, 160);
+    } else {
+      btn.classList.add('wrong');
+      // Штраф — 400мс пауза без нового раунда
+      setTimeout(() => { lock = false; btn.classList.remove('wrong'); }, 400);
+    }
+  }
+
+  const loop = () => {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (performance.now() - t0));
+    $('stroop-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      const score = correct * 250;
+      sendResult(score, performance.now() - t0);
+      $('stroop').innerHTML = `
+        <div style="text-align:center;color:white;">
+          <div style="font-size:56px;font-weight:800;">${correct}</div>
+          <div style="color:var(--muted);margin-top:6px;">правильных</div>
+          <div style="color:var(--muted);margin-top:20px;font-size:13px;">Ждём соперника...</div>
+        </div>
+      `;
+      return;
+    }
+    rafId = requestAnimationFrame(loop);
+  };
+  next();
+  rafId = requestAnimationFrame(loop);
+
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
+}
+
+// ─── Memory (флип-карточки) ───
+const MEMORY_ICONS = ["🎯","⚡","🔥","💎","🏆","🎮","🎨","🎭","🚀","⭐","🎪","🎲","🦊","🐉","🌟","💀"];
+
+function startMemoryGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="mem-area" id="mem">
+      <div class="mem-hud">🃏 <span id="mem-pairs">0</span> пар • <span id="mem-time">30.0</span>s</div>
+      <div class="mem-grid" id="mem-grid"></div>
+    </div>
+  `;
+  const DURATION = 30000;
+  const COLS = 4, ROWS = 4; // 8 пар
+  const t0 = performance.now();
+  let pairs = 0;
+  let first = null;
+  let lock = false;
+  let finished = false;
+  let rafId = null;
+
+  // Подготовка колоды
+  const iconPool = MEMORY_ICONS.slice(0, (COLS * ROWS) / 2);
+  const deck = [...iconPool, ...iconPool].sort(() => Math.random() - 0.5);
+  const grid = $('mem-grid');
+  grid.style.gridTemplateColumns = `repeat(${COLS}, 72px)`;
+  deck.forEach((icon, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'mem-card';
+    btn.dataset.icon = icon;
+    btn.dataset.idx = idx;
+    btn.innerHTML = `
+      <div class="mem-card-inner">
+        <div class="mem-card-face mem-face-back">?</div>
+        <div class="mem-card-face mem-face-front">${icon}</div>
+      </div>
+    `;
+    btn.addEventListener('click', () => flip(btn));
+    grid.appendChild(btn);
+  });
+
+  function flip(btn) {
+    if (finished || lock) return;
+    if (btn.classList.contains('flipped') || btn.classList.contains('matched')) return;
+    btn.classList.add('flipped');
+    if (!first) { first = btn; return; }
+    // Второй клик — сравниваем
+    lock = true;
+    if (first.dataset.icon === btn.dataset.icon) {
+      pairs++;
+      $('mem-pairs').textContent = pairs;
+      first.classList.add('matched'); btn.classList.add('matched');
+      first = null; lock = false;
+      // Победа: все пары найдены — добавляем бонус к score
+      if (pairs >= iconPool.length) {
+        // Даём доп. очки за время — раньше → больше
+        // Перегенерируем колоду чтобы можно было продолжать
+        setTimeout(() => { if (!finished) regenerate(); }, 300);
+      }
+    } else {
+      setTimeout(() => {
+        first.classList.remove('flipped');
+        btn.classList.remove('flipped');
+        first = null; lock = false;
+      }, 700);
+    }
+  }
+
+  function regenerate() {
+    // Перемешиваем новую колоду — пользователь может заработать ещё очков
+    grid.innerHTML = '';
+    const newDeck = [...iconPool, ...iconPool].sort(() => Math.random() - 0.5);
+    newDeck.forEach(icon => {
+      const btn = document.createElement('button');
+      btn.className = 'mem-card';
+      btn.dataset.icon = icon;
+      btn.innerHTML = `
+        <div class="mem-card-inner">
+          <div class="mem-card-face mem-face-back">?</div>
+          <div class="mem-card-face mem-face-front">${icon}</div>
+        </div>
+      `;
+      btn.addEventListener('click', () => flip(btn));
+      grid.appendChild(btn);
+    });
+    first = null; lock = false;
+  }
+
+  const loop = () => {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (performance.now() - t0));
+    $('mem-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      const score = pairs * 300;
+      sendResult(score, performance.now() - t0);
+      $('mem').innerHTML = `
+        <div style="text-align:center;color:white;">
+          <div style="font-size:56px;font-weight:800;">${pairs}</div>
+          <div style="color:var(--muted);margin-top:6px;">пар найдено</div>
+          <div style="color:var(--muted);margin-top:20px;font-size:13px;">Ждём соперника...</div>
+        </div>
+      `;
+      return;
+    }
+    rafId = requestAnimationFrame(loop);
+  };
+  rafId = requestAnimationFrame(loop);
+
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
+}
+
+// ─── Spatial Memory (паттерн клеток) ───
+function startSpatialGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="sp-area" id="sp">
+      <div class="sp-hud">🧠 <span id="sp-level">1</span> уровень • <span id="sp-time">—</span>s</div>
+      <div class="sp-status" id="sp-status">Запоминай...</div>
+      <div class="sp-grid" id="sp-grid"></div>
+    </div>
+  `;
+  const MAX_DURATION = 45000;
+  const t0 = performance.now();
+  let level = 0;          // 0 → размер 3×3, 2 подсвеченных клетки
+  let finished = false;
+  let picked = new Set();
+  let pattern = new Set();
+  let allowClicks = false;
+  let rafId = null;
+
+  const hardTimer = setTimeout(() => { if (!finished) finish(); }, MAX_DURATION);
+
+  function gridSize() {
+    // 3×3 → 4×4 → 5×5 → 6×6
+    if (level < 3) return 3;
+    if (level < 7) return 4;
+    if (level < 12) return 5;
+    return 6;
+  }
+  function patternSize() {
+    return Math.min(gridSize() * gridSize() - 2, 2 + level);
+  }
+
+  function render(highlight) {
+    const s = gridSize();
+    const cell = Math.max(44, Math.min(80, Math.round(380 / s)));
+    const grid = $('sp-grid');
+    grid.style.gridTemplateColumns = `repeat(${s}, ${cell}px)`;
+    grid.innerHTML = '';
+    for (let i = 0; i < s * s; i++) {
+      const el = document.createElement('button');
+      el.className = 'sp-cell';
+      el.style.width = cell + 'px';
+      el.style.height = cell + 'px';
+      if (highlight && pattern.has(i)) el.classList.add('highlight');
+      el.addEventListener('click', () => onCell(i, el));
+      grid.appendChild(el);
+    }
+  }
+
+  function startLevel() {
+    if (finished) return;
+    $('sp-level').textContent = level + 1;
+    $('sp-status').textContent = 'Запоминай...';
+    const s = gridSize();
+    pattern = new Set();
+    while (pattern.size < patternSize()) pattern.add(Math.floor(Math.random() * (s * s)));
+    picked = new Set();
+    allowClicks = false;
+    render(true);
+    // Время показа убывает с уровнем
+    const showMs = Math.max(600, 1500 - level * 80);
+    setTimeout(() => {
+      if (finished) return;
+      $('sp-status').textContent = 'Воспроизведи';
+      render(false);
+      allowClicks = true;
+    }, showMs);
+  }
+
+  function onCell(i, el) {
+    if (!allowClicks || finished) return;
+    if (picked.has(i)) return;
+    picked.add(i);
+    if (pattern.has(i)) {
+      el.classList.add('picked');
+      if (picked.size >= pattern.size && [...picked].every(p => pattern.has(p))) {
+        // Уровень пройден
+        level++;
+        allowClicks = false;
+        setTimeout(() => { if (!finished) startLevel(); }, 400);
+      }
+    } else {
+      el.classList.add('wrong');
+      // Ошибка — финиш
+      allowClicks = false;
+      setTimeout(() => { if (!finished) finish(); }, 500);
+    }
+  }
+
+  function finish() {
+    if (finished) return;
+    finished = true;
+    clearTimeout(hardTimer);
+    cancelAnimationFrame(rafId);
+    const score = level * 400;
+    sendResult(score, performance.now() - t0);
+    $('sp-status').textContent = `Лучший уровень: ${level}`;
+    $('sp-grid').innerHTML = '';
+  }
+
+  const loop = () => {
+    if (finished) return;
+    const elapsed = (performance.now() - t0) / 1000;
+    $('sp-time').textContent = elapsed.toFixed(1);
+    rafId = requestAnimationFrame(loop);
+  };
+  startLevel();
+  rafId = requestAnimationFrame(loop);
+
+  return { cleanup: () => { finished = true; clearTimeout(hardTimer); cancelAnimationFrame(rafId); } };
+}
+
+// ─── Audio Reflex ───
+function startAudioGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="audio-area" id="aud">
+      <div class="audio-visual" id="aud-vis">🔇</div>
+      <div class="audio-big" id="aud-big">Жди сигнал...</div>
+      <div class="audio-hint">Сейчас раздастся звук. Кликни МОМЕНТАЛЬНО.</div>
+      <div class="audio-attempts" id="aud-list"></div>
+    </div>
+  `;
+  const ATTEMPTS = 3;
+  let attempt = 0;
+  let attempts = [];
+  const t0 = performance.now();
+  let waiting = false;
+  let timerId = null;
+  let showTs = 0;
+  let audioCtx = null;
+  let finished = false;
+  const el = $('aud');
+
+  // Инициализируем аудио-контекст при первом взаимодействии
+  function ensureCtx() {
+    if (audioCtx) return;
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {}
+  }
+  function beep() {
+    if (!audioCtx) return;
+    try {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+    } catch (e) {}
+  }
+
+  function scheduleNext() {
+    attempt++;
+    if (attempt > ATTEMPTS) { finish(); return; }
+    el.classList.remove('go', 'early');
+    $('aud-vis').textContent = '🔇';
+    $('aud-big').textContent = 'Жди сигнал...';
+    waiting = false;
+    const delay = 1500 + Math.random() * 3500;
+    timerId = setTimeout(() => {
+      ensureCtx(); beep();
+      el.classList.add('go');
+      $('aud-vis').textContent = '🔊';
+      $('aud-big').textContent = '!';
+      showTs = performance.now();
+      waiting = true;
+      hap('tap');
+    }, delay);
+  }
+  function renderList() {
+    $('aud-list').textContent = attempts.map(a => Math.round(a) + 'мс').join(' • ');
+  }
+  function onClick() {
+    ensureCtx();
+    if (!waiting && !el.classList.contains('go')) {
+      hap('error');
+      clearTimeout(timerId);
+      el.classList.add('early');
+      $('aud-big').textContent = 'Рано! +500мс';
+      attempts.push(500); renderList();
+      setTimeout(() => { if (!finished) scheduleNext(); }, 700);
+      return;
+    }
+    if (waiting) {
+      hap('success');
+      const rt = performance.now() - showTs;
+      attempts.push(rt);
+      waiting = false;
+      el.classList.remove('go');
+      $('aud-big').textContent = Math.round(rt) + ' мс';
+      renderList();
+      setTimeout(() => { if (!finished) scheduleNext(); }, 700);
+    }
+  }
+  function finish() {
+    if (finished) return;
+    finished = true;
+    let s = 0;
+    for (const rt of attempts) s += Math.max(0, 500 - Math.min(rt, 500)) * 3;
+    const elapsed = performance.now() - t0;
+    sendResult(s, elapsed);
+    $('aud-big').textContent = 'Готово: ' + Math.round(s);
+  }
+  el.addEventListener('click', onClick);
+  scheduleNext();
+  return { cleanup: () => { finished = true; clearTimeout(timerId); el.removeEventListener('click', onClick); try { audioCtx && audioCtx.close(); } catch(e){} } };
+}
+
+// ─── Rhythm ───
+function startRhythmGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="rhy-area" id="rhy">
+      <div class="rhy-hud">🎵 <span id="rhy-hits">0</span>/<span id="rhy-total">0</span> • <span id="rhy-time">20.0</span>s</div>
+      <div class="rhy-metronome" id="rhy-m">🎵</div>
+      <button class="rhy-tap" id="rhy-tap">ТАП</button>
+      <div class="rhy-result" id="rhy-res"></div>
+    </div>
+  `;
+  const DURATION = 20000;
+  const BPM = 120; // quarter every 500ms
+  const BEAT_MS = 60000 / BPM;
+  const t0 = performance.now();
+  let beats = []; // времена биений относительно t0
+  let totalBeats = 0;
+  let hits = 0;
+  let lastHitIdx = -1;
+  let score = 0;
+  let finished = false;
+  let rafId = null;
+  let beatTimerId = null;
+
+  const metronome = $('rhy-m');
+  const resEl = $('rhy-res');
+
+  function scheduleBeats() {
+    // Первый бит через 1 сек чтобы игрок был готов
+    let t = 1000;
+    while (t < DURATION) {
+      beats.push(t);
+      t += BEAT_MS;
+    }
+    totalBeats = beats.length;
+    $('rhy-total').textContent = totalBeats;
+    // Запускаем анимацию метронома по расписанию
+    for (const bt of beats) {
+      setTimeout(() => {
+        if (finished) return;
+        metronome.classList.add('beat');
+        setTimeout(() => metronome.classList.remove('beat'), 120);
+      }, bt);
+    }
+  }
+
+  function onTap() {
+    if (finished) return;
+    const now = performance.now() - t0;
+    // Ищем ближайший не использованный бит
+    let best = -1, bestDiff = Infinity;
+    for (let i = 0; i < beats.length; i++) {
+      if (i <= lastHitIdx) continue;
+      const d = Math.abs(beats[i] - now);
+      if (d < bestDiff) { bestDiff = d; best = i; }
+      if (beats[i] > now + 300) break;
+    }
+    if (best < 0 || bestDiff > 250) {
+      resEl.textContent = 'Мимо!';
+      resEl.style.color = 'var(--lose)';
+      hap('error');
+      return;
+    }
+    lastHitIdx = best;
+    hits++;
+    $('rhy-hits').textContent = hits;
+    // Чем точнее — тем больше очков
+    let pts = 0; let grade = '';
+    if (bestDiff < 60)       { pts = 200; grade = 'Идеально!'; hap('success'); }
+    else if (bestDiff < 120) { pts = 120; grade = 'Хорошо'; hap('tap'); }
+    else if (bestDiff < 200) { pts = 60;  grade = 'Поздно/Рано'; hap('tap'); }
+    else                     { pts = 20;  grade = 'Далеко'; }
+    score += pts;
+    resEl.textContent = `${grade} (+${pts})`;
+    resEl.style.color = pts >= 120 ? 'var(--win)' : 'var(--warn)';
+  }
+
+  const loop = () => {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (performance.now() - t0));
+    $('rhy-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      sendResult(score, performance.now() - t0);
+      $('rhy-m').textContent = '🏁';
+      resEl.textContent = `${hits}/${totalBeats} попаданий • ${score} очков`;
+      $('rhy-tap').disabled = true;
+      $('rhy-tap').style.opacity = 0.5;
+      return;
+    }
+    rafId = requestAnimationFrame(loop);
+  };
+  $('rhy-tap').addEventListener('click', onTap);
+  scheduleBeats();
+  rafId = requestAnimationFrame(loop);
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
+}
+
+// ─── Balance ───
+function startBalanceGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="bal-area" id="bal">
+      <div class="bal-hud">⚖️ <span id="bal-score">0</span> очков • <span id="bal-time">20.0</span>s</div>
+      <div class="bal-ring">
+        <div class="bal-target" id="bal-target"></div>
+        <div class="bal-ball" id="bal-ball"></div>
+      </div>
+      <div class="bal-hint">Держи палец ближе к центру кольца. Наклоняй экран или свайпай.</div>
+    </div>
+  `;
+  const DURATION = 20000;
+  const t0 = performance.now();
+  const ring = document.querySelector('.bal-ring');
+  const ball = $('bal-ball');
+  // Coordinates within ring, 0..1 where 0.5,0.5 = центр
+  let x = 0.5, y = 0.5;
+  let vx = 0, vy = 0;
+  let score = 0;
+  let finished = false;
+  let rafId = null;
+  let touchActive = false;
+  let touchX = 0.5, touchY = 0.5;
+
+  function updateBallPos() {
+    const r = ring.getBoundingClientRect();
+    const cx = x * r.width;
+    const cy = y * r.height;
+    ball.style.left = cx + 'px';
+    ball.style.top = cy + 'px';
+    ball.style.transform = `translate(-50%, -50%)`;
+  }
+  updateBallPos();
+
+  // Touch управление — игрок "тянет" шарик пальцем (смещение пальца от центра задаёт направление тяги)
+  const onTouch = (e) => {
+    e.preventDefault();
+    const t = e.touches ? e.touches[0] : e;
+    if (!t) return;
+    const r = ring.getBoundingClientRect();
+    touchX = (t.clientX - r.left) / r.width;
+    touchY = (t.clientY - r.top) / r.height;
+    touchActive = true;
+  };
+  const onTouchEnd = () => { touchActive = false; };
+  area.addEventListener('pointerdown', onTouch);
+  area.addEventListener('pointermove', onTouch);
+  area.addEventListener('pointerup', onTouchEnd);
+  area.addEventListener('pointercancel', onTouchEnd);
+
+  // Псевдо-гравитация: случайный дрейф усиливается со временем
+  let driftX = (Math.random() - 0.5) * 0.0004;
+  let driftY = (Math.random() - 0.5) * 0.0004;
+  let lastShuffle = t0;
+
+  const tick = (now) => {
+    if (finished) return;
+    const elapsed = now - t0;
+    if (elapsed > DURATION) {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      sendResult(Math.floor(score), elapsed);
+      return;
+    }
+    // Смена дрейфа каждые 2.5 сек
+    if (now - lastShuffle > 2500) {
+      driftX = (Math.random() - 0.5) * (0.0006 + elapsed / DURATION * 0.0008);
+      driftY = (Math.random() - 0.5) * (0.0006 + elapsed / DURATION * 0.0008);
+      lastShuffle = now;
+    }
+    // Тяга к пальцу
+    if (touchActive) {
+      const targetX = Math.min(1, Math.max(0, touchX));
+      const targetY = Math.min(1, Math.max(0, touchY));
+      vx += (targetX - x) * 0.02;
+      vy += (targetY - y) * 0.02;
+    }
+    // Добавляем дрейф
+    vx += driftX;
+    vy += driftY;
+    // Трение
+    vx *= 0.93; vy *= 0.93;
+    x += vx; y += vy;
+    // Границы
+    x = Math.max(0.05, Math.min(0.95, x));
+    y = Math.max(0.05, Math.min(0.95, y));
+    updateBallPos();
+    // Очки: чем ближе к центру — тем больше
+    const dist = Math.hypot(x - 0.5, y - 0.5);
+    if (dist < 0.18) {
+      score += (0.18 - dist) * 50;
+      $('bal-score').textContent = Math.floor(score);
+    }
+    $('bal-time').textContent = ((DURATION - elapsed) / 1000).toFixed(1);
+    rafId = requestAnimationFrame(tick);
+  };
+  rafId = requestAnimationFrame(tick);
+
+  return {
+    cleanup: () => {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      area.removeEventListener('pointerdown', onTouch);
+      area.removeEventListener('pointermove', onTouch);
+      area.removeEventListener('pointerup', onTouchEnd);
+      area.removeEventListener('pointercancel', onTouchEnd);
+    }
+  };
+}
+
+// ─── Quick Draw ───
+function startQuickDrawGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="qd-area" id="qd">
+      <div class="qd-hud">✏️ <span id="qd-step">0</span>/<span id="qd-total">20</span> • <span id="qd-time">30.0</span>s • <span id="qd-score">0</span></div>
+      <svg class="qd-svg" id="qd-svg"></svg>
+    </div>
+  `;
+  const el = $('qd');
+  const svg = $('qd-svg');
+  const DURATION = 30000;
+  const DOTS = 20;
+  const t0 = performance.now();
+  let currentIdx = 0;
+  let finished = false;
+  let rafId = null;
+  let score = 0;
+  let lastCorrectTs = t0;
+
+  // Генерим точки в разных квадрантах чтобы не пересекались слишком сильно
+  const rect = el.getBoundingClientRect();
+  const W = rect.width > 100 ? rect.width : (window.innerWidth || 400);
+  const H = rect.height > 100 ? rect.height : Math.max(300, (window.innerHeight || 500) - 200);
+  const dots = [];
+  const margin = 40;
+  for (let i = 0; i < DOTS; i++) {
+    dots.push({
+      x: margin + Math.random() * (W - 2 * margin),
+      y: margin + Math.random() * (H - 2 * margin),
+      num: i + 1,
+    });
+  }
+
+  function render() {
+    svg.innerHTML = '';
+    // Линии между уже соединёнными точками
+    for (let i = 1; i < currentIdx; i++) {
+      const a = dots[i - 1], b = dots[i];
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
+      line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
+      line.setAttribute('stroke', '#26d67f');
+      line.setAttribute('stroke-width', '2');
+      svg.appendChild(line);
+    }
+    // Точки
+    dots.forEach((d, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'qd-dot' + (i === currentIdx ? ' next' : (i < currentIdx ? ' done' : ''));
+      btn.style.left = d.x + 'px';
+      btn.style.top = d.y + 'px';
+      btn.textContent = d.num;
+      btn.addEventListener('click', () => onPick(i));
+      el.appendChild(btn);
+    });
+  }
+
+  function onPick(i) {
+    if (finished) return;
+    if (i !== currentIdx) {
+      hap('error');
+      return;
+    }
+    hap('tap');
+    currentIdx++;
+    score += 200;
+    $('qd-step').textContent = currentIdx;
+    $('qd-score').textContent = score;
+    lastCorrectTs = performance.now();
+    // Перерисовываем
+    el.querySelectorAll('.qd-dot').forEach(d => d.remove());
+    svg.innerHTML = '';
+    // Линии + точки заново
+    for (let j = 1; j <= currentIdx; j++) {
+      if (j < dots.length) {
+        const a = dots[j - 1], b = dots[j];
+        if (j < currentIdx) {
+          // Линия уже есть
+        }
+      }
+    }
+    render();
+    if (currentIdx >= DOTS) {
+      finish(true);
+    }
+  }
+
+  function finish(complete) {
+    if (finished) return;
+    finished = true;
+    cancelAnimationFrame(rafId);
+    // Бонус за скорость если прошёл все точки
+    if (complete) {
+      const timeLeft = Math.max(0, DURATION - (performance.now() - t0));
+      score += Math.floor(timeLeft / 10);
+    }
+    sendResult(score, performance.now() - t0);
+  }
+
+  const loop = () => {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (performance.now() - t0));
+    $('qd-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finish(false);
+      return;
+    }
+    rafId = requestAnimationFrame(loop);
+  };
+  render();
+  $('qd-total').textContent = DOTS;
+  rafId = requestAnimationFrame(loop);
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
+}
+
+// ═════════════════════════════════════════════════════════════
+//   Share result (виральный крючок)
+// ═════════════════════════════════════════════════════════════
+function generateShareImage(data) {
+  // data: { won, myNick, myScore, oppNick, oppScore, eloDelta, games }
+  const W = 1200, H = 630;  // стандарт OG image
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+
+  // Фон — градиент
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#0e0f13');
+  bg.addColorStop(1, '#1c1116');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Оранжевое свечение
+  const glow = ctx.createRadialGradient(W/2, H/2, 50, W/2, H/2, 600);
+  glow.addColorStop(0, data.won ? 'rgba(38,214,127,0.18)' : 'rgba(255,77,109,0.14)');
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+
+  // Логотип
+  ctx.fillStyle = '#ff7a29';
+  ctx.font = 'bold 36px system-ui, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('⚡ REFLEX ARENA', 60, 80);
+
+  // Вердикт
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 110px system-ui, sans-serif';
+  ctx.fillStyle = data.won ? '#26d67f' : (data.eloDelta === 0 ? '#ffc93c' : '#ff4d6d');
+  ctx.fillText(data.won ? 'ПОБЕДА' : (data.eloDelta === 0 ? 'НИЧЬЯ' : 'ПОРАЖЕНИЕ'), W/2, 230);
+
+  // Счёт
+  ctx.font = 'bold 140px "JetBrains Mono", monospace';
+  ctx.fillStyle = '#eaecef';
+  ctx.fillText(`${data.myScore} : ${data.oppScore}`, W/2, 390);
+
+  // Игроки
+  ctx.font = '500 30px system-ui, sans-serif';
+  ctx.fillStyle = '#8a93a6';
+  ctx.fillText(`${data.myNick}  vs  ${data.oppNick}`, W/2, 440);
+
+  // ELO
+  ctx.font = 'bold 44px system-ui, sans-serif';
+  ctx.fillStyle = data.eloDelta >= 0 ? '#26d67f' : '#ff4d6d';
+  const eloStr = (data.eloDelta >= 0 ? '+' : '') + data.eloDelta.toFixed(0) + ' ELO';
+  ctx.fillText(eloStr, W/2, 510);
+
+  // Призыв
+  ctx.font = '500 24px system-ui, sans-serif';
+  ctx.fillStyle = '#ffb86b';
+  ctx.fillText('Сыграй 1v1 на reflex-arena', W/2, 580);
+
+  return cv;
+}
+
+async function shareMatchResult() {
+  if (!LAST_FINISHED) return;
+  const cv = generateShareImage(LAST_FINISHED);
+  cv.toBlob(async (blob) => {
+    if (!blob) return;
+    const file = new File([blob], 'reflex-result.png', { type: 'image/png' });
+    // Web Share API (мобила и современные браузеры)
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: 'Reflex Arena',
+          text: LAST_FINISHED.won
+            ? `Обыграл ${LAST_FINISHED.oppNick} ${LAST_FINISHED.myScore}:${LAST_FINISHED.oppScore} ⚡`
+            : `Проиграл ${LAST_FINISHED.oppNick}. Реванш?`,
+        });
+        return;
+      } catch (e) {}
+    }
+    // Fallback — скачиваем картинку
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'reflex-result.png';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    // Также копируем текст с приглашением
+    try {
+      await navigator.clipboard.writeText(
+        `Я сыграл в Reflex Arena: ${LAST_FINISHED.myScore}:${LAST_FINISHED.oppScore}. ` +
+        `Попробуй: ${location.origin}/`
+      );
+    } catch (e) {}
+  }, 'image/png');
+}
+
+let LAST_FINISHED = null;
+
+// ═════════════════════════════════════════════════════════════
+//   PWA: Service Worker + install prompt
+// ═════════════════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  // Показываем кнопку "Установить" в шапке
+  const b = document.getElementById('install-btn');
+  if (b) b.style.display = 'inline-block';
+});
+async function triggerInstall() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  const b = document.getElementById('install-btn');
+  if (b) b.style.display = 'none';
+}
+
+// ═════════════════════════════════════════════════════════════
+//   Init
+// ═════════════════════════════════════════════════════════════
+boot();
+
+// Enter в поле пароля — submit
+$('auth-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+</script>
+
+</body>
+</html>
