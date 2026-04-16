@@ -878,12 +878,17 @@
   <!-- ── Auth screen ── -->
   <div class="screen" id="screen-auth">
     <div class="auth-prompt">
-      <h2>Войти в Reflex Arena</h2>
+      <h2 id="auth-title">Войти в Reflex Arena</h2>
       <input id="auth-nick" placeholder="Никнейм" autocomplete="off" />
       <input id="auth-pass" placeholder="Пароль" type="password" autocomplete="off" />
-      <button onclick="doLogin()">Войти</button>
+      <button id="auth-submit-btn" onclick="doAuth()">Войти</button>
       <div class="err" id="auth-err"></div>
-      <div class="hint">Нет аккаунта? Сначала зарегистрируйся на <a href="/" style="color: var(--accent);">главной</a>.</div>
+      <div class="hint" id="auth-switch-hint">
+        Нет аккаунта? <a href="#" onclick="switchAuthMode('register');return false;" style="color: var(--accent);">Зарегистрироваться →</a>
+      </div>
+      <div class="hint" style="margin-top:8px;">
+        Или <a href="#" onclick="loginAsGuest();return false;" style="color: var(--win);">играть как гость</a> (прогресс сохранить можно позже).
+      </div>
     </div>
   </div>
 
@@ -1202,7 +1207,7 @@ async function boot() {
   // Нет токена — создаём гостевой автоматически
   if (!API.token()) {
     try {
-      const r = await fetch('/api/guest_login', { method: 'POST' });
+      const r = await fetch('/api/auth/guest', { method: 'POST' });
       const data = await r.json();
       if (data.token) {
         API.setToken(data.token);
@@ -1218,7 +1223,7 @@ async function boot() {
     API.clearToken();
     // Попытаемся ещё раз через гостя
     try {
-      const r = await fetch('/api/guest_login', { method: 'POST' });
+      const r = await fetch('/api/auth/guest', { method: 'POST' });
       const data = await r.json();
       if (data.token) API.setToken(data.token);
     } catch (e) {}
@@ -1430,7 +1435,7 @@ async function submitClaim() {
     $('claim-err').textContent = 'Пароль минимум 4 символа';
     return;
   }
-  const r = await API.post('/api/claim_guest', { nickname: nick, password: pass });
+  const r = await API.post('/api/auth/claim_guest', { nickname: nick, password: pass });
   if (!r.ok) {
     $('claim-err').textContent = r.msg || 'Ошибка';
     return;
@@ -2401,7 +2406,23 @@ function leagueBadge(elo) {
 // ═════════════════════════════════════════════════════════════
 //   Auth
 // ═════════════════════════════════════════════════════════════
-async function doLogin() {
+let AUTH_MODE = 'login';   // 'login' | 'register'
+
+function switchAuthMode(mode) {
+  AUTH_MODE = mode;
+  if (mode === 'register') {
+    $('auth-title').textContent = 'Регистрация в Reflex Arena';
+    $('auth-submit-btn').textContent = 'Создать аккаунт';
+    $('auth-switch-hint').innerHTML = 'Уже есть аккаунт? <a href="#" onclick="switchAuthMode(\'login\');return false;" style="color: var(--accent);">Войти →</a>';
+  } else {
+    $('auth-title').textContent = 'Войти в Reflex Arena';
+    $('auth-submit-btn').textContent = 'Войти';
+    $('auth-switch-hint').innerHTML = 'Нет аккаунта? <a href="#" onclick="switchAuthMode(\'register\');return false;" style="color: var(--accent);">Зарегистрироваться →</a>';
+  }
+  $('auth-err').textContent = '';
+}
+
+async function doAuth() {
   const nick = $('auth-nick').value.trim();
   const pass = $('auth-pass').value;
   $('auth-err').textContent = '';
@@ -2409,18 +2430,41 @@ async function doLogin() {
     $('auth-err').textContent = 'Введи никнейм и пароль';
     return;
   }
-  const r = await fetch('/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nickname: nick, password: pass }),
-  });
-  const data = await r.json();
-  if (!r.ok) {
-    $('auth-err').textContent = data.detail || 'Ошибка входа';
-    return;
+  const url = AUTH_MODE === 'register' ? '/api/auth/register' : '/api/auth/login';
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nickname: nick, password: pass }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      $('auth-err').textContent = data.detail || (AUTH_MODE === 'register' ? 'Ошибка регистрации' : 'Ошибка входа');
+      return;
+    }
+    API.setToken(data.token);
+    hap('success');
+    boot();
+  } catch (e) {
+    $('auth-err').textContent = 'Ошибка сети';
   }
-  API.setToken(data.token);
-  boot();
+}
+
+// Обратная совместимость (на случай старых ссылок)
+async function doLogin() { AUTH_MODE = 'login'; return doAuth(); }
+
+async function loginAsGuest() {
+  try {
+    const r = await fetch('/api/auth/guest', { method: 'POST' });
+    const data = await r.json();
+    if (data.token) {
+      API.setToken(data.token);
+      hap('tap');
+      boot();
+    }
+  } catch (e) {
+    $('auth-err').textContent = 'Не удалось создать гостя';
+  }
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -4461,7 +4505,8 @@ async function triggerInstall() {
 boot();
 
 // Enter в поле пароля — submit
-$('auth-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+$('auth-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') doAuth(); });
+$('auth-nick').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('auth-pass').focus(); });
 </script>
 
 </body>
