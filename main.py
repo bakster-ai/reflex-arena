@@ -215,21 +215,54 @@ self.addEventListener('fetch', () => {});
                     headers={"Cache-Control": "no-cache"})
 
 
+STYLE_PREVIEWS = {"retro", "cyberpunk", "duolingo", "brutal"}
+
+
+def _render_index(style: str = "") -> Response:
+    """Отдаёт index.html с data-style атрибутом на body (для preview-тем)."""
+    path = os.path.join(frontend_dir, "index.html")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            html = f.read()
+    except Exception:
+        return Response("index.html not found", status_code=500)
+    if style and style in STYLE_PREVIEWS:
+        # Заменяем плейсхолдер внутри body
+        html = html.replace("<body><!--STYLE-PLACEHOLDER-->",
+                            f'<body data-style="{style}"><!--STYLE-PLACEHOLDER-->')
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
 @app.get("/")
 def serve_index():
-    return FileResponse(
-        os.path.join(frontend_dir, "index.html"),
-        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
-    )
+    return _render_index()
+
+
+@app.get("/retro")
+def serve_style_retro():
+    return _render_index("retro")
+
+
+@app.get("/cyberpunk")
+def serve_style_cyberpunk():
+    return _render_index("cyberpunk")
+
+
+@app.get("/duolingo")
+def serve_style_duolingo():
+    return _render_index("duolingo")
+
+
+@app.get("/brutal")
+def serve_style_brutal():
+    return _render_index("brutal")
 
 
 @app.get("/{full_path:path}")
 def spa_fallback(full_path: str):
-    """Всё что не совпало — отдаём index.html (SPA роутинг, на случай client-side маршрутов)."""
-    # НО если путь выглядит как API/WS/share/profile — не отдавать HTML (иначе затеняет роуты)
-    # Эти роуты уже определены выше — FastAPI разрулит сам. Этот хендлер просто fallback.
+    """Всё что не совпало — отдаём index.html (SPA роутинг)."""
     path = full_path or ""
     if path.startswith("api/") or path.startswith("ws/") or path.startswith("share/") or path.startswith("profile/"):
         return Response(status_code=404)
-    return FileResponse(os.path.join(frontend_dir, "index.html"),
-                        headers={"Cache-Control": "no-cache"})
+    return _render_index()
