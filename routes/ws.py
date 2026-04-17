@@ -949,17 +949,32 @@ class ReflexRoom:
         if ev:
             ev.set()
             self._reconnect_events[role] = asyncio.Event()  # reset для будущих disconnect'ов
-        # Отсылаем игроку текущее состояние матча
+        # Если раунд уже идёт и клиент ещё не прислал result — перезапускаем раунд для него
         game_id = self.games[self.round_num] if self.round_num < self.best_of else None
-        await _safe_send(new_ws, {
-            "type": "rejoined",
-            "round_num": self.round_num + 1,
-            "total_rounds": self.best_of,
-            "rounds_won": self.rounds_won,
-            "game": game_id,
-            "game_name": GAMES[game_id]["name"] if game_id else None,
-            "game_desc": GAMES[game_id]["desc"] if game_id else None,
-        })
+        if game_id and self.round_results.get(role) is None:
+            # Раунд активен, клиент отвалился до отправки score — пересылаем round_start
+            self.round_start_ts = time.time()  # сбрасываем timestamp (anti-cheat будет считать от нового времени)
+            await _safe_send(new_ws, {
+                "type": "round_start",
+                "round_num": self.round_num + 1,
+                "total_rounds": self.best_of,
+                "game": game_id,
+                "game_name": GAMES[game_id]["name"],
+                "game_desc": GAMES[game_id]["desc"],
+                "rounds_won": self.rounds_won,
+                "start_in_ms": 3000,
+            })
+        else:
+            # Раунд завершён или клиент уже отправил result — шлём обзор
+            await _safe_send(new_ws, {
+                "type": "rejoined",
+                "round_num": self.round_num + 1,
+                "total_rounds": self.best_of,
+                "rounds_won": self.rounds_won,
+                "game": game_id,
+                "game_name": GAMES[game_id]["name"] if game_id else None,
+                "game_desc": GAMES[game_id]["desc"] if game_id else None,
+            })
         return True
 
     async def serve_role(self, role: str):

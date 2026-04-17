@@ -4772,7 +4772,6 @@ $('auth-nick').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('au
 //   Style switcher (плашка внизу для перехода между темами)
 // ═════════════════════════════════════════════════════════════
 (function initStyleSwitcher() {
-  const CURRENT = document.body.dataset.style || '';
   const styles = [
     { id: '', name: 'Default', path: '/' },
     { id: 'retro', name: '🕹️ Retro', path: '/retro' },
@@ -4780,11 +4779,26 @@ $('auth-nick').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('au
     { id: 'duolingo', name: '🌈 Duo', path: '/duolingo' },
     { id: 'brutal', name: '🧱 Brutal', path: '/brutal' },
   ];
+  function getCurrent() { return document.body.dataset.style || ''; }
+  function render(div) {
+    div.innerHTML = styles.map(s =>
+      `<a href="#" data-sid="${s.id}" class="${s.id === getCurrent() ? 'current' : ''}">${s.name}</a>`
+    ).join('');
+  }
   const div = document.createElement('div');
   div.className = 'style-switcher';
-  div.innerHTML = styles.map(s =>
-    `<a href="${s.path}" class="${s.id === CURRENT ? 'current' : ''}">${s.name}</a>`
-  ).join('');
+  render(div);
+  // Переключение БЕЗ перезагрузки — меняем data-style на body + pushState
+  div.addEventListener('click', (e) => {
+    e.preventDefault();
+    const a = e.target.closest('[data-sid]');
+    if (!a) return;
+    const sid = a.dataset.sid;
+    document.body.dataset.style = sid;
+    const newPath = sid ? '/' + sid : '/';
+    try { history.replaceState(null, '', newPath); } catch (_) {}
+    render(div);
+  });
   document.body.appendChild(div);
 })();
 </script>
