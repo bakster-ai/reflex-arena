@@ -139,7 +139,9 @@
     .stake-btn.selected {
       background: rgba(255, 122, 41, 0.15); border-color: var(--accent); color: var(--accent2);
     }
-    .stake-btn:hover:not(.selected) { background: #232833; }
+    @media (hover: hover) and (pointer: fine) {
+      .stake-btn:hover:not(.selected) { background: #232833; }
+    }
     .stake-custom {
       width: 100%; background: var(--panel2); border: 1.5px solid var(--border);
       color: var(--text); padding: 12px; border-radius: 10px; font-size: 14px;
@@ -373,8 +375,15 @@
       color: var(--text); border-radius: 14px;
       transition: transform 0.08s, background 0.1s;
       font-family: 'JetBrains Mono', monospace;
+      outline: none !important;
+      -webkit-tap-highlight-color: transparent;
     }
-    .math-opt:hover { background: var(--panel2); border-color: var(--accent); }
+    .math-opt:focus, .math-opt:focus-visible { outline: none !important; border-color: var(--border) !important; background: var(--panel) !important; }
+    .math-opt:focus.correct, .math-opt:focus-visible.correct { background: rgba(38, 214, 127, 0.3) !important; border-color: var(--win) !important; }
+    .math-opt:focus.wrong, .math-opt:focus-visible.wrong { background: rgba(255, 77, 109, 0.3) !important; border-color: var(--lose) !important; }
+    @media (hover: hover) and (pointer: fine) {
+      .math-opt:hover { background: var(--panel2); border-color: var(--accent); }
+    }
     .math-opt:active { transform: scale(0.95); }
     .math-opt.correct { background: rgba(38, 214, 127, 0.3); border-color: var(--win); }
     .math-opt.wrong { background: rgba(255, 77, 109, 0.3); border-color: var(--lose); }
@@ -1279,19 +1288,6 @@
     body[data-style="brutal"] .game-area { background: #fff; }
     body[data-style="brutal"] #top-nick { color: #000; font-weight: 900; }
 
-    /* Плашка стиля в правом нижнем углу для быстрого переключения */
-    .style-switcher {
-      position: fixed; bottom: 10px; left: 10px; z-index: 9000;
-      display: flex; gap: 4px; flex-wrap: wrap;
-      background: rgba(0,0,0,0.7); padding: 4px; border-radius: 20px;
-      max-width: calc(100vw - 20px);
-    }
-    .style-switcher a {
-      color: #fff; text-decoration: none; font-size: 11px; font-weight: 700;
-      padding: 4px 10px; border-radius: 20px;
-      background: rgba(255,255,255,0.08);
-    }
-    .style-switcher a.current { background: var(--accent); color: #000; }
   </style>
 </head>
 <body><!--STYLE-PLACEHOLDER-->
@@ -2215,6 +2211,10 @@ function applyTheme(t) {
   // Динамически меняем CSS-переменные
   document.documentElement.style.setProperty('--accent', t.accent);
   document.documentElement.style.setProperty('--accent2', t.accent2);
+  // Style-preset (retro/cyber/duo/brutal) если есть — кладём на body
+  const style = t.style || '';
+  document.body.dataset.style = style;
+  try { localStorage.setItem('ra_active_theme', style); } catch (_) {}
 }
 
 async function loadShopThemes() {
@@ -2561,26 +2561,167 @@ function startWordMemoryGame() {
 
 // Словарь стран для flags_rain и map_tap
 const COUNTRIES_POOL = [
-  { code: 'RU', name: 'Россия', flag: '🇷🇺', x: 0.65, y: 0.30 },
-  { code: 'US', name: 'США',    flag: '🇺🇸', x: 0.20, y: 0.38 },
-  { code: 'CN', name: 'Китай',  flag: '🇨🇳', x: 0.75, y: 0.42 },
-  { code: 'JP', name: 'Япония', flag: '🇯🇵', x: 0.83, y: 0.41 },
-  { code: 'DE', name: 'Германия', flag: '🇩🇪', x: 0.52, y: 0.35 },
-  { code: 'FR', name: 'Франция',  flag: '🇫🇷', x: 0.49, y: 0.38 },
-  { code: 'IT', name: 'Италия',   flag: '🇮🇹', x: 0.52, y: 0.42 },
-  { code: 'ES', name: 'Испания',  flag: '🇪🇸', x: 0.46, y: 0.42 },
-  { code: 'GB', name: 'Британия', flag: '🇬🇧', x: 0.48, y: 0.32 },
-  { code: 'BR', name: 'Бразилия', flag: '🇧🇷', x: 0.30, y: 0.65 },
-  { code: 'AR', name: 'Аргентина',flag: '🇦🇷', x: 0.28, y: 0.80 },
-  { code: 'AU', name: 'Австралия',flag: '🇦🇺', x: 0.85, y: 0.78 },
-  { code: 'IN', name: 'Индия',    flag: '🇮🇳', x: 0.68, y: 0.50 },
-  { code: 'EG', name: 'Египет',   flag: '🇪🇬', x: 0.56, y: 0.50 },
-  { code: 'ZA', name: 'ЮАР',      flag: '🇿🇦', x: 0.54, y: 0.78 },
-  { code: 'CA', name: 'Канада',   flag: '🇨🇦', x: 0.22, y: 0.25 },
-  { code: 'MX', name: 'Мексика',  flag: '🇲🇽', x: 0.20, y: 0.48 },
-  { code: 'TR', name: 'Турция',   flag: '🇹🇷', x: 0.56, y: 0.42 },
-  { code: 'KR', name: 'Корея',    flag: '🇰🇷', x: 0.79, y: 0.42 },
-  { code: 'UA', name: 'Украина',  flag: '🇺🇦', x: 0.55, y: 0.34 },
+  // СНГ и соседи
+  { code: 'RU', name: 'Россия',      flag: '🇷🇺' },
+  { code: 'UA', name: 'Украина',     flag: '🇺🇦' },
+  { code: 'BY', name: 'Беларусь',    flag: '🇧🇾' },
+  { code: 'KZ', name: 'Казахстан',   flag: '🇰🇿' },
+  { code: 'UZ', name: 'Узбекистан',  flag: '🇺🇿' },
+  { code: 'KG', name: 'Киргизия',    flag: '🇰🇬' },
+  { code: 'AM', name: 'Армения',     flag: '🇦🇲' },
+  { code: 'AZ', name: 'Азербайджан', flag: '🇦🇿' },
+  { code: 'GE', name: 'Грузия',      flag: '🇬🇪' },
+  { code: 'MD', name: 'Молдова',     flag: '🇲🇩' },
+  // Европа
+  { code: 'DE', name: 'Германия',    flag: '🇩🇪' },
+  { code: 'FR', name: 'Франция',     flag: '🇫🇷' },
+  { code: 'IT', name: 'Италия',      flag: '🇮🇹' },
+  { code: 'ES', name: 'Испания',     flag: '🇪🇸' },
+  { code: 'PT', name: 'Португалия',  flag: '🇵🇹' },
+  { code: 'GB', name: 'Великобритания', flag: '🇬🇧' },
+  { code: 'IE', name: 'Ирландия',    flag: '🇮🇪' },
+  { code: 'NL', name: 'Нидерланды',  flag: '🇳🇱' },
+  { code: 'BE', name: 'Бельгия',     flag: '🇧🇪' },
+  { code: 'CH', name: 'Швейцария',   flag: '🇨🇭' },
+  { code: 'AT', name: 'Австрия',     flag: '🇦🇹' },
+  { code: 'SE', name: 'Швеция',      flag: '🇸🇪' },
+  { code: 'NO', name: 'Норвегия',    flag: '🇳🇴' },
+  { code: 'FI', name: 'Финляндия',   flag: '🇫🇮' },
+  { code: 'DK', name: 'Дания',       flag: '🇩🇰' },
+  { code: 'PL', name: 'Польша',      flag: '🇵🇱' },
+  { code: 'CZ', name: 'Чехия',       flag: '🇨🇿' },
+  { code: 'SK', name: 'Словакия',    flag: '🇸🇰' },
+  { code: 'HU', name: 'Венгрия',     flag: '🇭🇺' },
+  { code: 'RO', name: 'Румыния',     flag: '🇷🇴' },
+  { code: 'BG', name: 'Болгария',    flag: '🇧🇬' },
+  { code: 'GR', name: 'Греция',      flag: '🇬🇷' },
+  { code: 'RS', name: 'Сербия',      flag: '🇷🇸' },
+  { code: 'HR', name: 'Хорватия',    flag: '🇭🇷' },
+  { code: 'IS', name: 'Исландия',    flag: '🇮🇸' },
+  { code: 'EE', name: 'Эстония',     flag: '🇪🇪' },
+  { code: 'LV', name: 'Латвия',      flag: '🇱🇻' },
+  { code: 'LT', name: 'Литва',       flag: '🇱🇹' },
+  { code: 'TR', name: 'Турция',      flag: '🇹🇷' },
+  // Америки
+  { code: 'US', name: 'США',         flag: '🇺🇸' },
+  { code: 'CA', name: 'Канада',      flag: '🇨🇦' },
+  { code: 'MX', name: 'Мексика',     flag: '🇲🇽' },
+  { code: 'BR', name: 'Бразилия',    flag: '🇧🇷' },
+  { code: 'AR', name: 'Аргентина',   flag: '🇦🇷' },
+  { code: 'CL', name: 'Чили',        flag: '🇨🇱' },
+  { code: 'CO', name: 'Колумбия',    flag: '🇨🇴' },
+  { code: 'PE', name: 'Перу',        flag: '🇵🇪' },
+  { code: 'VE', name: 'Венесуэла',   flag: '🇻🇪' },
+  { code: 'CU', name: 'Куба',        flag: '🇨🇺' },
+  // Азия
+  { code: 'CN', name: 'Китай',       flag: '🇨🇳' },
+  { code: 'JP', name: 'Япония',      flag: '🇯🇵' },
+  { code: 'KR', name: 'Южная Корея', flag: '🇰🇷' },
+  { code: 'KP', name: 'КНДР',        flag: '🇰🇵' },
+  { code: 'IN', name: 'Индия',       flag: '🇮🇳' },
+  { code: 'PK', name: 'Пакистан',    flag: '🇵🇰' },
+  { code: 'ID', name: 'Индонезия',   flag: '🇮🇩' },
+  { code: 'VN', name: 'Вьетнам',     flag: '🇻🇳' },
+  { code: 'TH', name: 'Таиланд',     flag: '🇹🇭' },
+  { code: 'MY', name: 'Малайзия',    flag: '🇲🇾' },
+  { code: 'PH', name: 'Филиппины',   flag: '🇵🇭' },
+  { code: 'SG', name: 'Сингапур',    flag: '🇸🇬' },
+  { code: 'IR', name: 'Иран',        flag: '🇮🇷' },
+  { code: 'IQ', name: 'Ирак',        flag: '🇮🇶' },
+  { code: 'SA', name: 'Саудовская Аравия', flag: '🇸🇦' },
+  { code: 'AE', name: 'ОАЭ',         flag: '🇦🇪' },
+  { code: 'IL', name: 'Израиль',     flag: '🇮🇱' },
+  { code: 'MN', name: 'Монголия',    flag: '🇲🇳' },
+  // Африка
+  { code: 'EG', name: 'Египет',      flag: '🇪🇬' },
+  { code: 'MA', name: 'Марокко',     flag: '🇲🇦' },
+  { code: 'DZ', name: 'Алжир',       flag: '🇩🇿' },
+  { code: 'TN', name: 'Тунис',       flag: '🇹🇳' },
+  { code: 'LY', name: 'Ливия',       flag: '🇱🇾' },
+  { code: 'SD', name: 'Судан',       flag: '🇸🇩' },
+  { code: 'NG', name: 'Нигерия',     flag: '🇳🇬' },
+  { code: 'KE', name: 'Кения',       flag: '🇰🇪' },
+  { code: 'ET', name: 'Эфиопия',     flag: '🇪🇹' },
+  { code: 'ZA', name: 'ЮАР',         flag: '🇿🇦' },
+  { code: 'GH', name: 'Гана',        flag: '🇬🇭' },
+  { code: 'SN', name: 'Сенегал',     flag: '🇸🇳' },
+  { code: 'CI', name: 'Кот-д\'Ивуар', flag: '🇨🇮' },
+  { code: 'CM', name: 'Камерун',     flag: '🇨🇲' },
+  { code: 'CD', name: 'ДР Конго',    flag: '🇨🇩' },
+  { code: 'AO', name: 'Ангола',      flag: '🇦🇴' },
+  { code: 'UG', name: 'Уганда',      flag: '🇺🇬' },
+  { code: 'TZ', name: 'Танзания',    flag: '🇹🇿' },
+  { code: 'ZW', name: 'Зимбабве',    flag: '🇿🇼' },
+  { code: 'MZ', name: 'Мозамбик',    flag: '🇲🇿' },
+  { code: 'MG', name: 'Мадагаскар',  flag: '🇲🇬' },
+  { code: 'NA', name: 'Намибия',     flag: '🇳🇦' },
+  { code: 'BW', name: 'Ботсвана',    flag: '🇧🇼' },
+  { code: 'ZM', name: 'Замбия',      flag: '🇿🇲' },
+  { code: 'RW', name: 'Руанда',      flag: '🇷🇼' },
+  { code: 'ML', name: 'Мали',        flag: '🇲🇱' },
+  { code: 'BF', name: 'Буркина-Фасо', flag: '🇧🇫' },
+  { code: 'NE', name: 'Нигер',       flag: '🇳🇪' },
+  { code: 'SO', name: 'Сомали',      flag: '🇸🇴' },
+  // Океания
+  { code: 'AU', name: 'Австралия',   flag: '🇦🇺' },
+  { code: 'NZ', name: 'Новая Зеландия', flag: '🇳🇿' },
+  { code: 'FJ', name: 'Фиджи',       flag: '🇫🇯' },
+  { code: 'PG', name: 'Папуа — Новая Гвинея', flag: '🇵🇬' },
+  // Доп. Европа
+  { code: 'SI', name: 'Словения',    flag: '🇸🇮' },
+  { code: 'BA', name: 'Босния и Герцеговина', flag: '🇧🇦' },
+  { code: 'MK', name: 'Северная Македония', flag: '🇲🇰' },
+  { code: 'AL', name: 'Албания',     flag: '🇦🇱' },
+  { code: 'ME', name: 'Черногория',  flag: '🇲🇪' },
+  { code: 'XK', name: 'Косово',      flag: '🇽🇰' },
+  { code: 'CY', name: 'Кипр',        flag: '🇨🇾' },
+  { code: 'MT', name: 'Мальта',      flag: '🇲🇹' },
+  { code: 'LU', name: 'Люксембург',  flag: '🇱🇺' },
+  { code: 'MC', name: 'Монако',      flag: '🇲🇨' },
+  { code: 'LI', name: 'Лихтенштейн', flag: '🇱🇮' },
+  { code: 'AD', name: 'Андорра',     flag: '🇦🇩' },
+  { code: 'SM', name: 'Сан-Марино',  flag: '🇸🇲' },
+  { code: 'VA', name: 'Ватикан',     flag: '🇻🇦' },
+  // Доп. Америки
+  { code: 'UY', name: 'Уругвай',     flag: '🇺🇾' },
+  { code: 'PY', name: 'Парагвай',    flag: '🇵🇾' },
+  { code: 'BO', name: 'Боливия',     flag: '🇧🇴' },
+  { code: 'EC', name: 'Эквадор',     flag: '🇪🇨' },
+  { code: 'GT', name: 'Гватемала',   flag: '🇬🇹' },
+  { code: 'HN', name: 'Гондурас',    flag: '🇭🇳' },
+  { code: 'NI', name: 'Никарагуа',   flag: '🇳🇮' },
+  { code: 'CR', name: 'Коста-Рика',  flag: '🇨🇷' },
+  { code: 'PA', name: 'Панама',      flag: '🇵🇦' },
+  { code: 'DO', name: 'Доминикана',  flag: '🇩🇴' },
+  { code: 'JM', name: 'Ямайка',      flag: '🇯🇲' },
+  { code: 'HT', name: 'Гаити',       flag: '🇭🇹' },
+  { code: 'TT', name: 'Тринидад и Тобаго', flag: '🇹🇹' },
+  { code: 'SV', name: 'Сальвадор',   flag: '🇸🇻' },
+  // Доп. Азия и Ближний Восток
+  { code: 'TJ', name: 'Таджикистан', flag: '🇹🇯' },
+  { code: 'TM', name: 'Туркменистан', flag: '🇹🇲' },
+  { code: 'AF', name: 'Афганистан',  flag: '🇦🇫' },
+  { code: 'BD', name: 'Бангладеш',   flag: '🇧🇩' },
+  { code: 'LK', name: 'Шри-Ланка',   flag: '🇱🇰' },
+  { code: 'NP', name: 'Непал',       flag: '🇳🇵' },
+  { code: 'BT', name: 'Бутан',       flag: '🇧🇹' },
+  { code: 'MM', name: 'Мьянма',      flag: '🇲🇲' },
+  { code: 'KH', name: 'Камбоджа',    flag: '🇰🇭' },
+  { code: 'LA', name: 'Лаос',        flag: '🇱🇦' },
+  { code: 'BN', name: 'Бруней',      flag: '🇧🇳' },
+  { code: 'TW', name: 'Тайвань',     flag: '🇹🇼' },
+  { code: 'HK', name: 'Гонконг',     flag: '🇭🇰' },
+  { code: 'MO', name: 'Макао',       flag: '🇲🇴' },
+  { code: 'MV', name: 'Мальдивы',    flag: '🇲🇻' },
+  { code: 'SY', name: 'Сирия',       flag: '🇸🇾' },
+  { code: 'LB', name: 'Ливан',       flag: '🇱🇧' },
+  { code: 'JO', name: 'Иордания',    flag: '🇯🇴' },
+  { code: 'PS', name: 'Палестина',   flag: '🇵🇸' },
+  { code: 'YE', name: 'Йемен',       flag: '🇾🇪' },
+  { code: 'OM', name: 'Оман',        flag: '🇴🇲' },
+  { code: 'QA', name: 'Катар',       flag: '🇶🇦' },
+  { code: 'BH', name: 'Бахрейн',     flag: '🇧🇭' },
+  { code: 'KW', name: 'Кувейт',      flag: '🇰🇼' },
 ];
 
 // ─── Flags rain: поймай нужный флаг ───
@@ -2600,9 +2741,14 @@ function startFlagsRainGame() {
   let fallingFlags = []; // {el, country, x, y, vy}
   let lastSpawn = 0;
   const field = $('fr-field');
+  const recentTargets = [];  // не повторяем последние 10 целей
 
   function pickTarget() {
-    targetCountry = COUNTRIES_POOL[Math.floor(Math.random() * COUNTRIES_POOL.length)];
+    const avail = COUNTRIES_POOL.filter(c => !recentTargets.includes(c.code));
+    const pool = avail.length > 0 ? avail : COUNTRIES_POOL;
+    targetCountry = pool[Math.floor(Math.random() * pool.length)];
+    recentTargets.push(targetCountry.code);
+    if (recentTargets.length > 10) recentTargets.shift();
     $('fr-task').textContent = 'Поймай: ' + targetCountry.name;
   }
 
@@ -2835,16 +2981,26 @@ function startMapTapGame() {
       <div class="math-hud">🎌 <span id="mt-correct">0</span> ✓ • <span id="mt-wrong">0</span> ✗ • <span id="mt-time">20.0</span>s</div>
       <div id="mt-flag" style="font-size:120px;margin-top:24px;margin-bottom:20px;text-align:center;">🏳️</div>
       <div style="color:var(--muted);font-size:13px;margin-bottom:14px;">Какая это страна?</div>
-      <div class="math-options" id="mt-opts" style="width:90%;max-width:360px;"></div>
+      <div class="math-options" id="mt-opts" style="grid-template-columns:1fr 1fr;width:90%;max-width:360px;margin:0 auto;"></div>
     </div>
   `;
   const DURATION = 20000;
   const t0 = performance.now();
   let correct = 0, wrong = 0, finished = false, rafId = null, lock = false;
+  const recentTargets = [];  // чтобы не повторять последние 10 флагов
+
+  function pickNonRepeating() {
+    const avail = COUNTRIES_POOL.filter(c => !recentTargets.includes(c.code));
+    const pool = avail.length > 0 ? avail : COUNTRIES_POOL;
+    const t = pool[Math.floor(Math.random() * pool.length)];
+    recentTargets.push(t.code);
+    if (recentTargets.length > 10) recentTargets.shift();
+    return t;
+  }
 
   function next() {
     if (finished) return;
-    const target = COUNTRIES_POOL[Math.floor(Math.random() * COUNTRIES_POOL.length)];
+    const target = pickNonRepeating();
     $('mt-flag').textContent = target.flag;
     // 4 варианта: target + 3 случайных других
     const opts = new Set([target.name]);
@@ -2854,6 +3010,7 @@ function startMapTapGame() {
     }
     const shuffled = [...opts].sort(() => Math.random() - 0.5);
     const optsEl = $('mt-opts');
+    try { document.activeElement && document.activeElement.blur && document.activeElement.blur(); } catch (_) {}
     optsEl.innerHTML = '';
     lock = false;
     shuffled.forEach(name => {
@@ -3075,8 +3232,8 @@ function startCountDotsGame() {
   area.innerHTML = `
     <div class="math-area" id="cd" style="overflow:hidden;">
       <div class="math-hud">🔢 <span id="cd-correct">0</span> ✓ • <span id="cd-wrong">0</span> ✗ • <span id="cd-time">20.0</span>s</div>
-      <div id="cd-field" style="position:relative;width:260px;height:180px;background:var(--panel2);border:2px solid var(--border);border-radius:12px;margin:20px 0;"></div>
-      <div id="cd-opts" class="math-options" style="width:90%;max-width:360px;"></div>
+      <div id="cd-field" style="position:relative;width:260px;height:180px;background:var(--panel2);border:2px solid var(--border);border-radius:12px;margin:20px auto;"></div>
+      <div id="cd-opts" class="math-options" style="grid-template-columns:1fr 1fr;width:90%;max-width:360px;margin:0 auto;"></div>
     </div>
   `;
   const DURATION = 20000;
@@ -3106,6 +3263,7 @@ function startCountDotsGame() {
       }
       const shuffled = [...opts].sort(() => Math.random() - 0.5);
       const optsEl = $('cd-opts');
+      try { document.activeElement && document.activeElement.blur && document.activeElement.blur(); } catch (_) {}
       optsEl.innerHTML = '';
       shuffled.forEach(v => {
         const btn = document.createElement('button');
@@ -5833,38 +5991,13 @@ $('auth-nick').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('au
   if (pass) pass.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitAuthModal(); });
 })();
 
-// ═════════════════════════════════════════════════════════════
-//   Style switcher (плашка внизу для перехода между темами)
-// ═════════════════════════════════════════════════════════════
-(function initStyleSwitcher() {
-  const styles = [
-    { id: '', name: 'Default', path: '/' },
-    { id: 'retro', name: '🕹️ Retro', path: '/retro' },
-    { id: 'cyberpunk', name: '🧠 Cyber', path: '/cyberpunk' },
-    { id: 'duolingo', name: '🌈 Duo', path: '/duolingo' },
-    { id: 'brutal', name: '🧱 Brutal', path: '/brutal' },
-  ];
-  function getCurrent() { return document.body.dataset.style || ''; }
-  function render(div) {
-    div.innerHTML = styles.map(s =>
-      `<a href="#" data-sid="${s.id}" class="${s.id === getCurrent() ? 'current' : ''}">${s.name}</a>`
-    ).join('');
-  }
-  const div = document.createElement('div');
-  div.className = 'style-switcher';
-  render(div);
-  // Переключение БЕЗ перезагрузки — меняем data-style на body + pushState
-  div.addEventListener('click', (e) => {
-    e.preventDefault();
-    const a = e.target.closest('[data-sid]');
-    if (!a) return;
-    const sid = a.dataset.sid;
-    document.body.dataset.style = sid;
-    const newPath = sid ? '/' + sid : '/';
-    try { history.replaceState(null, '', newPath); } catch (_) {}
-    render(div);
-  });
-  document.body.appendChild(div);
+// Themes are now applied via owned_themes purchase (see shop).
+// Applying saved theme on load:
+(function applyOwnedTheme() {
+  try {
+    const active = localStorage.getItem('ra_active_theme') || '';
+    if (active) document.body.dataset.style = active;
+  } catch (_) {}
 })();
 </script>
 

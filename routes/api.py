@@ -276,9 +276,13 @@ def daily_challenge_submit(
 THEMES = {
     "classic": {"name": "Классика", "price": 0,   "accent": "#ff7a29", "accent2": "#ffb86b"},
     "neon":    {"name": "Неон",     "price": 500, "accent": "#00ff9d", "accent2": "#ff00e5"},
-    "retro":   {"name": "Ретро",    "price": 500, "accent": "#ff4081", "accent2": "#ffd740"},
     "midnight":{"name": "Полночь",  "price": 800, "accent": "#7dd3fc", "accent2": "#a78bfa"},
     "emerald": {"name": "Изумруд",  "price": 800, "accent": "#26d67f", "accent2": "#7fe3b0"},
+    # style-presets — полный фирменный стиль, а не только accent
+    "retro":     {"name": "🕹️ Ретро-аркада", "price": 1500, "accent": "#ff4081", "accent2": "#ffd740", "style": "retro"},
+    "cyberpunk": {"name": "🧠 Cyberpunk",    "price": 1500, "accent": "#00fff7", "accent2": "#ff00e5", "style": "cyberpunk"},
+    "duolingo":  {"name": "🌈 Duolingo",     "price": 1500, "accent": "#58cc02", "accent2": "#ffc800", "style": "duolingo"},
+    "brutal":    {"name": "🧱 Брутал",        "price": 1500, "accent": "#000000", "accent2": "#ffeb3b", "style": "brutal"},
 }
 
 
@@ -315,6 +319,7 @@ def shop_themes(authorization: Optional[str] = Header(None), db: Session = Depen
         "themes": [
             {"id": k, "name": v["name"], "price": v["price"],
              "accent": v["accent"], "accent2": v["accent2"],
+             "style": v.get("style", ""),
              "owned": k in owned, "equipped": k == equipped}
             for k, v in THEMES.items()
         ],
