@@ -208,13 +208,6 @@ GAMES = {
         "min_elapsed_ms": 2000,
         "max_elapsed_ms": 60000,
     },
-    "audio": {
-        "name": "Слух",
-        "desc": "Кликай когда услышишь сигнал (3 попытки). Фальстарт −1.",
-        "max_score": 10,
-        "min_elapsed_ms": 4000,
-        "max_elapsed_ms": 30000,
-    },
     "rhythm": {
         "name": "Ритм",
         "desc": "Тапай в такт метронома. Точно = +1, мимо = 0.",
@@ -223,11 +216,11 @@ GAMES = {
         "max_elapsed_ms": 22000,
     },
     "balance": {
-        "name": "Баланс",
-        "desc": "Удерживай шарик в центре кольца. Очко = секунда в центре.",
-        "max_score": 30,
-        "min_elapsed_ms": 19500,
-        "max_elapsed_ms": 21000,
+        "name": "Гольф",
+        "desc": "Тяни палец от мяча чтобы ударить (как рогатка). Забей в лунку. 30 сек.",
+        "max_score": 20,
+        "min_elapsed_ms": 29500,
+        "max_elapsed_ms": 31000,
     },
     "quick_draw": {
         "name": "Быстрый штрих",
@@ -257,33 +250,33 @@ GAMES = {
         "min_elapsed_ms": 10000,
         "max_elapsed_ms": 60000,
     },
-    "trivia_geo": {
-        "name": "География",
-        "desc": "Столицы, флаги, достопримечательности. +1/−1. 20 сек.",
+    "flags_rain": {
+        "name": "Поймай флаг",
+        "desc": "Над экраном — задача «Поймай [страна]». Флаги падают сверху, тапай только нужный. Мимо = −1. 20 сек.",
         "max_score": 30,
         "min_elapsed_ms": 19500,
         "max_elapsed_ms": 21000,
     },
-    "trivia_science": {
-        "name": "Наука",
-        "desc": "Физика, химия, биология, космос. +1/−1. 20 сек.",
-        "max_score": 30,
+    "sort_zones": {
+        "name": "Сортировка",
+        "desc": "Эмодзи появляется посередине — свайпни в нужную зону. Живое/неживое, съедобное/несъедобное и т.д. 20 сек.",
+        "max_score": 40,
         "min_elapsed_ms": 19500,
         "max_elapsed_ms": 21000,
     },
-    "trivia_history": {
-        "name": "История",
-        "desc": "Даты, события, личности. +1/−1. 20 сек.",
-        "max_score": 30,
+    "map_tap": {
+        "name": "Карта мира",
+        "desc": "Сверху страна — тапни её на карте. Чем точнее — тем больше очков. 20 сек.",
+        "max_score": 20,
         "min_elapsed_ms": 19500,
         "max_elapsed_ms": 21000,
     },
-    "trivia_pop": {
-        "name": "Поп-культура",
-        "desc": "Кино, музыка, интернет, мемы. +1/−1. 20 сек.",
-        "max_score": 30,
-        "min_elapsed_ms": 19500,
-        "max_elapsed_ms": 21000,
+    "timeline": {
+        "name": "Хронология",
+        "desc": "Расставь события в правильном порядке от древнего к новому. 30 сек.",
+        "max_score": 15,
+        "min_elapsed_ms": 5000,
+        "max_elapsed_ms": 32000,
     },
 }
 GAME_POOL = list(GAMES.keys())
@@ -293,7 +286,7 @@ BASE_ELO = 1000.0
 # Категории игр → для категорийного ELO
 GAME_CATEGORIES = {
     # 🔴 Реакция
-    "react": "reaction", "audio": "reaction", "aim": "reaction", "odd": "reaction",
+    "react": "reaction", "aim": "reaction", "odd": "reaction",
     # 🟡 Логика
     "math": "logic", "sequence": "logic", "stroop": "logic", "number_chain": "logic",
     # 🟢 Память
@@ -301,7 +294,7 @@ GAME_CATEGORIES = {
     # 🔵 Координация
     "balance": "coordination", "rhythm": "coordination", "quick_draw": "coordination", "typing": "coordination",
     # 🟣 Эрудиция
-    "trivia_geo": "trivia", "trivia_science": "trivia", "trivia_history": "trivia", "trivia_pop": "trivia",
+    "flags_rain": "trivia", "sort_zones": "trivia", "map_tap": "trivia", "timeline": "trivia",
 }
 
 CATEGORY_ELO_FIELD = {
@@ -316,43 +309,30 @@ CATEGORY_ELO_FIELD = {
 # Фактическая формула: random(score - var, score + var)
 AI_PROFILES = {
     # score в единицах (balls, правильных ответов, попаданий, уровней).
-    # (среднее, разброс) для каждой мини-игры.
     "easy": {
-        "react": (3, 2), "aim": (10, 4), "sequence": (3, 1),
-        "math": (6, 3), "odd": (5, 2),
-        "typing": (4, 2), "stroop": (5, 2),
-        "memory": (3, 2), "spatial": (2, 1),
-        "audio": (2, 1), "rhythm": (10, 3),
-        "balance": (3, 2), "quick_draw": (5, 2),
-        "number_chain": (5, 2), "visual_memory": (3, 2), "word_memory": (4, 2),
-        "trivia_geo": (5, 2), "trivia_science": (4, 2),
-        "trivia_history": (4, 2), "trivia_pop": (5, 2),
+        "react": (3, 2), "aim": (10, 4), "sequence": (3, 1), "odd": (5, 2),
+        "math": (6, 3), "stroop": (5, 2), "number_chain": (5, 2),
+        "memory": (3, 2), "spatial": (2, 1), "visual_memory": (3, 2), "word_memory": (4, 2),
+        "typing": (4, 2), "rhythm": (10, 3), "balance": (2, 1), "quick_draw": (5, 2),
+        "flags_rain": (4, 2), "sort_zones": (8, 3), "map_tap": (4, 2), "timeline": (2, 1),
         "elo": 800, "nickname": "🤖 AI Новичок",
         "elapsed_factor": 0.9,
     },
     "medium": {
-        "react": (6, 2), "aim": (22, 4), "sequence": (5, 1),
-        "math": (12, 3), "odd": (12, 3),
-        "typing": (9, 2), "stroop": (12, 3),
-        "memory": (7, 2), "spatial": (5, 1),
-        "audio": (4, 1), "rhythm": (22, 4),
-        "balance": (8, 2), "quick_draw": (12, 3),
-        "number_chain": (12, 3), "visual_memory": (6, 2), "word_memory": (10, 3),
-        "trivia_geo": (12, 3), "trivia_science": (10, 3),
-        "trivia_history": (10, 3), "trivia_pop": (12, 3),
+        "react": (6, 2), "aim": (22, 4), "sequence": (5, 1), "odd": (12, 3),
+        "math": (12, 3), "stroop": (12, 3), "number_chain": (12, 3),
+        "memory": (7, 2), "spatial": (5, 1), "visual_memory": (6, 2), "word_memory": (10, 3),
+        "typing": (9, 2), "rhythm": (22, 4), "balance": (5, 2), "quick_draw": (12, 3),
+        "flags_rain": (10, 3), "sort_zones": (18, 4), "map_tap": (9, 3), "timeline": (6, 2),
         "elo": 1000, "nickname": "🤖 AI Средний",
         "elapsed_factor": 1.0,
     },
     "hard": {
-        "react": (10, 2), "aim": (35, 5), "sequence": (8, 1),
-        "math": (20, 3), "odd": (22, 3),
-        "typing": (15, 3), "stroop": (20, 3),
-        "memory": (12, 2), "spatial": (10, 2),
-        "audio": (6, 1), "rhythm": (35, 4),
-        "balance": (14, 2), "quick_draw": (18, 3),
-        "number_chain": (22, 3), "visual_memory": (9, 1), "word_memory": (14, 2),
-        "trivia_geo": (20, 3), "trivia_science": (18, 3),
-        "trivia_history": (18, 3), "trivia_pop": (20, 3),
+        "react": (10, 2), "aim": (35, 5), "sequence": (8, 1), "odd": (22, 3),
+        "math": (20, 3), "stroop": (20, 3), "number_chain": (22, 3),
+        "memory": (12, 2), "spatial": (10, 2), "visual_memory": (9, 1), "word_memory": (14, 2),
+        "typing": (15, 3), "rhythm": (35, 4), "balance": (10, 2), "quick_draw": (18, 3),
+        "flags_rain": (18, 3), "sort_zones": (28, 4), "map_tap": (14, 3), "timeline": (10, 2),
         "elo": 1300, "nickname": "🤖 AI Мастер",
         "elapsed_factor": 1.0,
     },
@@ -456,7 +436,7 @@ def _ai_elapsed_for(game_id: str, difficulty: str) -> int:
     max_e = cfg.get("max_elapsed_ms", 60000)
     factor = prof.get("elapsed_factor", 1.0)
     # Игры с фиксированной длительностью: играем всю её
-    if game_id in ("aim", "math", "odd", "typing", "stroop", "memory", "rhythm", "balance"):
+    if game_id in ("aim", "math", "odd", "typing", "stroop", "memory", "rhythm", "balance", "flags_rain", "sort_zones", "map_tap", "number_chain"):
         return int(min(max_e, max(min_e, max_e * 0.97 * factor)))
     # react/sequence/spatial/audio/quick_draw: может быть короче
     return int(min_e + random.random() * 500)

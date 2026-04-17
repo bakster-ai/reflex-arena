@@ -135,22 +135,32 @@ def claim_daily_task(
 
 # Пул мини-игр, которые ротируются в Daily Challenge
 DAILY_CHALLENGE_POOL = [
-    "aim", "math", "odd", "typing", "stroop", "memory", "spatial",
-    "rhythm", "balance", "quick_draw",
+    "aim", "odd",
+    "math", "stroop", "number_chain",
+    "memory", "spatial", "visual_memory", "word_memory",
+    "typing", "rhythm", "balance", "quick_draw",
+    "flags_rain", "sort_zones", "map_tap", "timeline",
 ]
 
 # Anti-cheat границы (совпадают с GAMES в reflex_ws.py)
 _DC_LIMITS = {
-    "aim":     {"min_ms": 14500, "max_ms": 16500, "max_score": 10000},
-    "math":    {"min_ms": 19500, "max_ms": 21000, "max_score": 10000},
-    "odd":     {"min_ms": 19500, "max_ms": 21000, "max_score": 10000},
-    "typing":  {"min_ms": 19500, "max_ms": 21000, "max_score": 10000},
-    "stroop":  {"min_ms": 19500, "max_ms": 21000, "max_score": 10000},
-    "memory":  {"min_ms": 3000,  "max_ms": 32000, "max_score": 10000},
-    "spatial": {"min_ms": 2000,  "max_ms": 60000, "max_score": 10000},
-    "rhythm":  {"min_ms": 15000, "max_ms": 22000, "max_score": 10000},
-    "balance": {"min_ms": 19500, "max_ms": 21000, "max_score": 10000},
-    "quick_draw": {"min_ms": 3000, "max_ms": 30000, "max_score": 10000},
+    "aim":     {"min_ms": 14500, "max_ms": 16500, "max_score": 100},
+    "math":    {"min_ms": 19500, "max_ms": 21000, "max_score": 50},
+    "odd":     {"min_ms": 19500, "max_ms": 21000, "max_score": 50},
+    "typing":  {"min_ms": 19500, "max_ms": 21000, "max_score": 50},
+    "stroop":  {"min_ms": 19500, "max_ms": 21000, "max_score": 50},
+    "memory":  {"min_ms": 3000,  "max_ms": 32000, "max_score": 30},
+    "spatial": {"min_ms": 2000,  "max_ms": 60000, "max_score": 30},
+    "rhythm":  {"min_ms": 15000, "max_ms": 22000, "max_score": 50},
+    "balance": {"min_ms": 29500, "max_ms": 31000, "max_score": 20},
+    "quick_draw": {"min_ms": 3000, "max_ms": 30000, "max_score": 25},
+    "number_chain": {"min_ms": 19500, "max_ms": 21000, "max_score": 50},
+    "visual_memory": {"min_ms": 10000, "max_ms": 60000, "max_score": 12},
+    "word_memory": {"min_ms": 10000, "max_ms": 60000, "max_score": 20},
+    "flags_rain": {"min_ms": 19500, "max_ms": 21000, "max_score": 30},
+    "sort_zones": {"min_ms": 19500, "max_ms": 21000, "max_score": 40},
+    "map_tap": {"min_ms": 19500, "max_ms": 21000, "max_score": 20},
+    "timeline": {"min_ms": 5000, "max_ms": 32000, "max_score": 15},
 }
 
 
@@ -195,7 +205,11 @@ def daily_challenge_info(authorization: Optional[str] = Header(None), db: Sessio
             "aim": "Снайпер", "math": "Устный счёт", "odd": "Найди отличие",
             "typing": "Скорость печати", "stroop": "Строп-тест",
             "memory": "Память", "spatial": "Пространственная память",
-            "rhythm": "Ритм", "balance": "Баланс", "quick_draw": "Быстрый штрих",
+            "visual_memory": "Визуальная память", "word_memory": "Слова",
+            "rhythm": "Ритм", "balance": "Гольф", "quick_draw": "Быстрый штрих",
+            "number_chain": "Числовая цепочка",
+            "flags_rain": "Поймай флаг", "sort_zones": "Сортировка",
+            "map_tap": "Карта мира", "timeline": "Хронология",
         }.get(game, game),
         "my_best": my_best,
         "my_attempts": my_attempts,

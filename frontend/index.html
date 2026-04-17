@@ -1684,7 +1684,6 @@
   </div>
 </div>
 
-<script src="/static/trivia_questions.js"></script>
 <script>
 // ═════════════════════════════════════════════════════════════
 //   Auth / API
@@ -2268,7 +2267,7 @@ function playDailyChallenge(game) {
   cleanupGame();
   $('game-area').innerHTML = `
     <div class="game-intro">
-      <div class="game-name">${escapeHtml({aim:'Снайпер',math:'Устный счёт',odd:'Найди отличие',typing:'Скорость печати',stroop:'Строп-тест',memory:'Память',spatial:'Пространственная память',rhythm:'Ритм',balance:'Баланс',quick_draw:'Быстрый штрих'}[game] || game)}</div>
+      <div class="game-name">${escapeHtml({aim:'Снайпер',math:'Устный счёт',odd:'Найди отличие',typing:'Скорость печати',stroop:'Строп-тест',memory:'Память',spatial:'Пространственная память',rhythm:'Ритм',balance:'Гольф',quick_draw:'Быстрый штрих',number_chain:'Числовая цепочка',visual_memory:'Визуальная память',word_memory:'Слова',flags_rain:'Поймай флаг',sort_zones:'Сортировка',map_tap:'Карта мира',timeline:'Хронология'}[game] || game)}</div>
       <div class="game-desc">Набери максимум очков. Твой лучший результат дня попадёт в топ.</div>
       <div class="countdown" id="cd">3</div>
     </div>
@@ -2518,76 +2517,445 @@ function startWordMemoryGame() {
   return { cleanup: () => { finished = true; } };
 }
 
-// ─── Trivia (эрудиция — 4 подтипа) ───
-function startTriviaGame(category) {
+// ─── Эрудиция: 4 динамические мини-игры (flags_rain, sort_zones, map_tap, timeline) ───
+
+// Словарь стран для flags_rain и map_tap
+const COUNTRIES_POOL = [
+  { code: 'RU', name: 'Россия', flag: '🇷🇺', x: 0.65, y: 0.30 },
+  { code: 'US', name: 'США',    flag: '🇺🇸', x: 0.20, y: 0.38 },
+  { code: 'CN', name: 'Китай',  flag: '🇨🇳', x: 0.75, y: 0.42 },
+  { code: 'JP', name: 'Япония', flag: '🇯🇵', x: 0.83, y: 0.41 },
+  { code: 'DE', name: 'Германия', flag: '🇩🇪', x: 0.52, y: 0.35 },
+  { code: 'FR', name: 'Франция',  flag: '🇫🇷', x: 0.49, y: 0.38 },
+  { code: 'IT', name: 'Италия',   flag: '🇮🇹', x: 0.52, y: 0.42 },
+  { code: 'ES', name: 'Испания',  flag: '🇪🇸', x: 0.46, y: 0.42 },
+  { code: 'GB', name: 'Британия', flag: '🇬🇧', x: 0.48, y: 0.32 },
+  { code: 'BR', name: 'Бразилия', flag: '🇧🇷', x: 0.30, y: 0.65 },
+  { code: 'AR', name: 'Аргентина',flag: '🇦🇷', x: 0.28, y: 0.80 },
+  { code: 'AU', name: 'Австралия',flag: '🇦🇺', x: 0.85, y: 0.78 },
+  { code: 'IN', name: 'Индия',    flag: '🇮🇳', x: 0.68, y: 0.50 },
+  { code: 'EG', name: 'Египет',   flag: '🇪🇬', x: 0.56, y: 0.50 },
+  { code: 'ZA', name: 'ЮАР',      flag: '🇿🇦', x: 0.54, y: 0.78 },
+  { code: 'CA', name: 'Канада',   flag: '🇨🇦', x: 0.22, y: 0.25 },
+  { code: 'MX', name: 'Мексика',  flag: '🇲🇽', x: 0.20, y: 0.48 },
+  { code: 'TR', name: 'Турция',   flag: '🇹🇷', x: 0.56, y: 0.42 },
+  { code: 'KR', name: 'Корея',    flag: '🇰🇷', x: 0.79, y: 0.42 },
+  { code: 'UA', name: 'Украина',  flag: '🇺🇦', x: 0.55, y: 0.34 },
+];
+
+// ─── Flags rain: поймай нужный флаг ───
+function startFlagsRainGame() {
   const area = $('game-area');
-  const catNames = { geo: 'География', science: 'Наука', history: 'История', pop: 'Поп-культура' };
-  const catIcons = { geo: '🌍', science: '🔬', history: '📜', pop: '🎬' };
-  area.innerHTML = `<div class="math-area" id="trv">
-    <div class="math-hud">${catIcons[category] || '❓'} <span id="trv-correct">0</span> ✓ • <span id="trv-wrong">0</span> ✗ • <span id="trv-time">20.0</span>s</div>
-    <div id="trv-q" style="font-size:20px;font-weight:700;max-width:360px;text-align:center;margin-bottom:22px;padding:0 16px;line-height:1.4;"></div>
-    <div class="math-options" id="trv-opts"></div>
-  </div>`;
+  area.innerHTML = `
+    <div class="math-area" id="fr" style="overflow:hidden;">
+      <div class="math-hud">🌊 <span id="fr-correct">0</span> ✓ • <span id="fr-wrong">0</span> ✗ • <span id="fr-time">20.0</span>s</div>
+      <div id="fr-task" style="position:absolute;top:48px;left:0;right:0;text-align:center;font-weight:800;font-size:18px;color:var(--accent2);">—</div>
+      <div id="fr-field" style="position:absolute;top:88px;left:0;right:0;bottom:0;overflow:hidden;"></div>
+    </div>
+  `;
   const DURATION = 20000;
   const t0 = performance.now();
-  let correct = 0, wrong = 0, finished = false, rafId = null, lock = false;
-  let usedIdx = new Set();
+  let correct = 0, wrong = 0, finished = false, rafId = null;
+  let targetCountry = null;
+  let fallingFlags = []; // {el, country, x, y, vy}
+  let lastSpawn = 0;
+  const field = $('fr-field');
 
-  // Загружаем вопросы из глобала (trivia_questions.js)
-  const questions = (typeof TRIVIA_QUESTIONS !== 'undefined' && TRIVIA_QUESTIONS[category]) || [];
-
-  function pickQuestion() {
-    if (usedIdx.size >= questions.length) usedIdx.clear();
-    let idx;
-    do { idx = Math.floor(Math.random() * questions.length); } while (usedIdx.has(idx) && usedIdx.size < questions.length);
-    usedIdx.add(idx);
-    return questions[idx];
+  function pickTarget() {
+    targetCountry = COUNTRIES_POOL[Math.floor(Math.random() * COUNTRIES_POOL.length)];
+    $('fr-task').textContent = 'Поймай: ' + targetCountry.name;
   }
 
-  function next() {
-    if (finished || questions.length === 0) {
-      if (questions.length === 0) {
-        $('trv-q').textContent = 'Вопросы загружаются...';
-        setTimeout(() => { if (!finished) sendResult(0, performance.now() - t0); }, 1000);
+  function spawnFlag() {
+    const r = field.getBoundingClientRect();
+    const W = r.width > 50 ? r.width : window.innerWidth;
+    // 40% шанс чтобы был правильный флаг
+    const c = Math.random() < 0.4 ? targetCountry : COUNTRIES_POOL[Math.floor(Math.random() * COUNTRIES_POOL.length)];
+    const el = document.createElement('div');
+    el.textContent = c.flag;
+    el.style.cssText = 'position:absolute;font-size:42px;cursor:pointer;user-select:none;z-index:2;';
+    el.style.left = (Math.random() * (W - 60)) + 'px';
+    el.style.top = '-60px';
+    const vy = 1.2 + Math.random() * 0.8;
+    const item = { el, country: c, x: parseFloat(el.style.left), y: -60, vy, caught: false };
+    el.addEventListener('click', () => {
+      if (item.caught || finished) return;
+      item.caught = true;
+      if (c.code === targetCountry.code) {
+        correct++; $('fr-correct').textContent = correct; hap('success');
+        el.style.filter = 'drop-shadow(0 0 10px #26d67f)';
+      } else {
+        wrong++; $('fr-wrong').textContent = wrong; hap('error');
+        el.style.filter = 'drop-shadow(0 0 10px #ff4d6d) grayscale(1)';
       }
+      setTimeout(() => el.remove(), 200);
+    });
+    field.appendChild(el);
+    fallingFlags.push(item);
+  }
+
+  function tick(now) {
+    if (finished) return;
+    const elapsed = now - t0;
+    const left = Math.max(0, DURATION - elapsed);
+    $('fr-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      const score = correct - wrong;
+      sendResult(score, elapsed);
+      $('fr').innerHTML = `<div style="text-align:center;color:white;"><div style="font-size:56px;font-weight:800;">${score}</div><div style="color:var(--muted);margin-top:6px;">${correct} поймано, ${wrong} мимо</div></div>`;
       return;
     }
-    const q = pickQuestion();
-    $('trv-q').textContent = q.q;
-    // Перемешиваем ответы (первый = правильный)
-    const correctAns = q.a[0];
-    const shuffled = [...q.a].sort(() => Math.random() - 0.5);
-    const optsEl = $('trv-opts');
-    optsEl.innerHTML = '';
-    lock = false;
-    shuffled.forEach(a => {
-      const btn = document.createElement('button');
-      btn.className = 'math-opt'; btn.style.fontSize = '14px'; btn.style.padding = '14px 10px';
-      btn.textContent = a;
-      btn.addEventListener('click', () => {
-        if (lock || finished) return; lock = true;
-        if (a === correctAns) { correct++; $('trv-correct').textContent = correct; btn.classList.add('correct'); hap('success'); }
-        else {
-          wrong++; $('trv-wrong').textContent = wrong;
-          btn.classList.add('wrong'); hap('error');
-          optsEl.querySelectorAll('.math-opt').forEach(b => { if (b.textContent === correctAns) b.classList.add('correct'); });
+    // Меняем target каждые 4 сек
+    if (Math.floor(elapsed / 4000) !== Math.floor((elapsed - 16) / 4000) && elapsed > 100) {
+      pickTarget();
+    }
+    // Спавн флагов
+    if (now - lastSpawn > 700) {
+      lastSpawn = now;
+      spawnFlag();
+    }
+    // Падение
+    const rH = field.getBoundingClientRect().height;
+    fallingFlags = fallingFlags.filter(f => {
+      if (f.caught) return false;
+      f.y += f.vy;
+      f.el.style.top = f.y + 'px';
+      if (f.y > rH + 20) {
+        f.el.remove();
+        // Если пропустил правильный флаг — штраф
+        if (f.country.code === targetCountry.code) {
+          wrong++; $('fr-wrong').textContent = wrong;
         }
-        setTimeout(() => { if (!finished) next(); }, 400);
-      });
-      optsEl.appendChild(btn);
+        return false;
+      }
+      return true;
+    });
+    rafId = requestAnimationFrame(tick);
+  }
+
+  pickTarget();
+  rafId = requestAnimationFrame(tick);
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); fallingFlags.forEach(f => f.el.remove()); } };
+}
+
+// ─── Sort zones: свайп в правильную зону ───
+const SORT_CATEGORIES = [
+  {
+    title: 'Живое ← → Неживое',
+    left: 'Живое', right: 'Неживое',
+    items: [
+      ['🐶', 'L'], ['🐱', 'L'], ['🌳', 'L'], ['🐛', 'L'], ['🦋', 'L'], ['🐟', 'L'], ['🌻', 'L'], ['🦎', 'L'],
+      ['🪨', 'R'], ['🚗', 'R'], ['📱', 'R'], ['🔨', 'R'], ['💎', 'R'], ['🏠', 'R'], ['⌚', 'R'], ['🎸', 'R'],
+    ],
+  },
+  {
+    title: 'Съедобное ← → Несъедобное',
+    left: 'Съедобное', right: 'Несъедобное',
+    items: [
+      ['🍎', 'L'], ['🍕', 'L'], ['🥕', 'L'], ['🍞', 'L'], ['🥩', 'L'], ['🧀', 'L'], ['🍓', 'L'], ['🍣', 'L'],
+      ['⚽', 'R'], ['📚', 'R'], ['🔑', 'R'], ['🪑', 'R'], ['🎈', 'R'], ['✏️', 'R'], ['🧻', 'R'], ['🔋', 'R'],
+    ],
+  },
+  {
+    title: 'Лето ← → Зима',
+    left: 'Лето', right: 'Зима',
+    items: [
+      ['☀️', 'L'], ['🌊', 'L'], ['🍉', 'L'], ['🏖️', 'L'], ['🌺', 'L'], ['🦟', 'L'], ['🍦', 'L'], ['🌴', 'L'],
+      ['❄️', 'R'], ['⛄', 'R'], ['🎿', 'R'], ['🧣', 'R'], ['🧤', 'R'], ['🌨️', 'R'], ['⛸️', 'R'], ['🎄', 'R'],
+    ],
+  },
+  {
+    title: 'Транспорт ← → Животное',
+    left: 'Транспорт', right: 'Животное',
+    items: [
+      ['🚗', 'L'], ['✈️', 'L'], ['🚂', 'L'], ['🚲', 'L'], ['🛵', 'L'], ['🚁', 'L'], ['⛵', 'L'], ['🚀', 'L'],
+      ['🦁', 'R'], ['🐘', 'R'], ['🦊', 'R'], ['🐺', 'R'], ['🦒', 'R'], ['🐬', 'R'], ['🦜', 'R'], ['🐢', 'R'],
+    ],
+  },
+];
+
+function startSortZonesGame() {
+  const area = $('game-area');
+  const cat = SORT_CATEGORIES[Math.floor(Math.random() * SORT_CATEGORIES.length)];
+  area.innerHTML = `
+    <div class="math-area" id="sz" style="overflow:hidden;">
+      <div class="math-hud">↔️ <span id="sz-correct">0</span> ✓ • <span id="sz-wrong">0</span> ✗ • <span id="sz-time">20.0</span>s</div>
+      <div style="position:absolute;top:48px;left:0;right:0;text-align:center;font-weight:700;font-size:15px;color:var(--accent2);">${escapeHtml(cat.title)}</div>
+      <div id="sz-zone-l" style="position:absolute;top:78px;left:8px;bottom:60px;width:28%;border:2px dashed var(--win);border-radius:16px;display:flex;align-items:center;justify-content:center;color:var(--win);font-weight:800;font-size:14px;text-align:center;padding:8px;pointer-events:none;">${escapeHtml(cat.left)}<br>⬅</div>
+      <div id="sz-zone-r" style="position:absolute;top:78px;right:8px;bottom:60px;width:28%;border:2px dashed var(--accent);border-radius:16px;display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:800;font-size:14px;text-align:center;padding:8px;pointer-events:none;">${escapeHtml(cat.right)}<br>➡</div>
+      <div id="sz-item" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:80px;cursor:grab;user-select:none;touch-action:none;z-index:5;">?</div>
+    </div>
+  `;
+  const DURATION = 20000;
+  const t0 = performance.now();
+  let correct = 0, wrong = 0, finished = false, rafId = null;
+  let currentItem = null;
+  let dragging = false, dragStartX = 0, dragStartY = 0, dragX = 0, dragY = 0;
+  const itemEl = $('sz-item');
+
+  function pickItem() {
+    currentItem = cat.items[Math.floor(Math.random() * cat.items.length)];
+    itemEl.textContent = currentItem[0];
+    itemEl.style.transform = 'translate(-50%, -50%)';
+    dragX = 0; dragY = 0;
+  }
+
+  function resolve(side /* 'L' or 'R' */) {
+    const isCorrect = side === currentItem[1];
+    if (isCorrect) { correct++; $('sz-correct').textContent = correct; hap('success'); }
+    else { wrong++; $('sz-wrong').textContent = wrong; hap('error'); }
+    // Анимация улёта
+    const targetX = side === 'L' ? -300 : 300;
+    itemEl.style.transition = 'transform 0.3s, opacity 0.3s';
+    itemEl.style.transform = `translate(calc(-50% + ${targetX}px), -50%)`;
+    itemEl.style.opacity = '0';
+    setTimeout(() => {
+      if (finished) return;
+      itemEl.style.transition = '';
+      itemEl.style.opacity = '1';
+      pickItem();
+    }, 300);
+  }
+
+  function onStart(e) {
+    if (finished) return;
+    dragging = true;
+    const t = e.touches ? e.touches[0] : e;
+    dragStartX = t.clientX; dragStartY = t.clientY;
+    itemEl.style.cursor = 'grabbing';
+  }
+  function onMove(e) {
+    if (!dragging) return;
+    e.preventDefault();
+    const t = e.touches ? e.touches[0] : e;
+    dragX = t.clientX - dragStartX;
+    dragY = t.clientY - dragStartY;
+    itemEl.style.transform = `translate(calc(-50% + ${dragX}px), calc(-50% + ${dragY}px))`;
+  }
+  function onEnd() {
+    if (!dragging) return;
+    dragging = false;
+    itemEl.style.cursor = 'grab';
+    if (Math.abs(dragX) > 60) {
+      resolve(dragX < 0 ? 'L' : 'R');
+    } else {
+      // Возвращаем на место
+      itemEl.style.transition = 'transform 0.2s';
+      itemEl.style.transform = 'translate(-50%, -50%)';
+      setTimeout(() => { itemEl.style.transition = ''; }, 200);
+    }
+  }
+
+  itemEl.addEventListener('mousedown', onStart);
+  itemEl.addEventListener('touchstart', onStart, { passive: true });
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('touchmove', onMove, { passive: false });
+  window.addEventListener('mouseup', onEnd);
+  window.addEventListener('touchend', onEnd);
+
+  function loop(now) {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (now - t0));
+    $('sz-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      const score = correct - wrong;
+      sendResult(score, now - t0);
+      $('sz').innerHTML = `<div style="text-align:center;color:white;"><div style="font-size:56px;font-weight:800;">${score}</div><div style="color:var(--muted);margin-top:6px;">${correct} верно, ${wrong} ошибок</div></div>`;
+      return;
+    }
+    rafId = requestAnimationFrame(loop);
+  }
+
+  pickItem();
+  rafId = requestAnimationFrame(loop);
+  return {
+    cleanup: () => {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      itemEl.removeEventListener('mousedown', onStart);
+      itemEl.removeEventListener('touchstart', onStart);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('mouseup', onEnd);
+      window.removeEventListener('touchend', onEnd);
+    }
+  };
+}
+
+// ─── Map tap: тапни страну на карте ───
+function startMapTapGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="math-area" id="mt" style="overflow:hidden;">
+      <div class="math-hud">🗺️ <span id="mt-score">0</span> • <span id="mt-time">20.0</span>s</div>
+      <div style="position:absolute;top:48px;left:0;right:0;text-align:center;font-weight:800;font-size:16px;color:var(--accent2);" id="mt-task">—</div>
+      <div id="mt-map" style="position:absolute;top:86px;left:10px;right:10px;bottom:10px;background:#1a3a5e;border-radius:12px;overflow:hidden;cursor:crosshair;">
+        <svg viewBox="0 0 100 50" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;" preserveAspectRatio="none">
+          <!-- Упрощённые континенты -->
+          <path d="M3 8 L20 6 L28 10 L30 22 L22 32 L15 30 L8 24 Z" fill="#2a5a2a" opacity="0.7"/>
+          <path d="M18 35 L28 34 L32 60 L22 78 L18 80 L15 60 Z" fill="#2a5a2a" opacity="0.7"/>
+          <path d="M38 14 L62 12 L68 18 L66 32 L58 36 L48 36 L42 28 L38 22 Z" fill="#2a5a2a" opacity="0.7"/>
+          <path d="M48 38 L62 40 L66 62 L50 82 L48 60 Z" fill="#2a5a2a" opacity="0.7"/>
+          <path d="M60 16 L86 14 L94 28 L92 44 L84 50 L72 46 L64 38 Z" fill="#2a5a2a" opacity="0.7"/>
+          <path d="M76 72 L92 68 L96 82 L82 88 Z" fill="#2a5a2a" opacity="0.7"/>
+        </svg>
+      </div>
+    </div>
+  `;
+  const DURATION = 20000;
+  const t0 = performance.now();
+  let score = 0, finished = false, rafId = null;
+  let targetCountry = null;
+  const mapEl = $('mt-map');
+
+  function nextTarget() {
+    targetCountry = COUNTRIES_POOL[Math.floor(Math.random() * COUNTRIES_POOL.length)];
+    $('mt-task').textContent = 'Найди: ' + targetCountry.name;
+  }
+
+  function onMapClick(e) {
+    if (finished || !targetCountry) return;
+    const r = mapEl.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width;
+    const py = (e.clientY - r.top) / r.height;
+    const dist = Math.hypot(px - targetCountry.x, py - targetCountry.y);
+    // Показываем маркер правильного места
+    const marker = document.createElement('div');
+    marker.style.cssText = `position:absolute;left:${targetCountry.x * 100}%;top:${targetCountry.y * 100}%;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;background:#ff4d6d;border:2px solid white;pointer-events:none;z-index:3;`;
+    mapEl.appendChild(marker);
+    const myMarker = document.createElement('div');
+    myMarker.style.cssText = `position:absolute;left:${px * 100}%;top:${py * 100}%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#26d67f;border:2px solid white;pointer-events:none;z-index:3;`;
+    mapEl.appendChild(myMarker);
+    // Очки за близость: < 0.05 = +3, < 0.10 = +2, < 0.18 = +1, дальше = 0
+    let pts = 0, grade = 'Мимо';
+    if (dist < 0.05) { pts = 3; grade = 'Идеально! +3'; hap('success'); }
+    else if (dist < 0.10) { pts = 2; grade = 'Близко +2'; hap('success'); }
+    else if (dist < 0.18) { pts = 1; grade = 'Рядом +1'; hap('tap'); }
+    else { pts = 0; hap('error'); }
+    score += pts;
+    $('mt-score').textContent = score;
+    $('mt-task').textContent = grade + ' — ' + targetCountry.name;
+    setTimeout(() => {
+      if (finished) return;
+      marker.remove(); myMarker.remove();
+      nextTarget();
+    }, 900);
+  }
+
+  mapEl.addEventListener('click', onMapClick);
+
+  function loop(now) {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (now - t0));
+    $('mt-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      sendResult(score, now - t0);
+      $('mt').innerHTML = `<div style="text-align:center;color:white;"><div style="font-size:56px;font-weight:800;">${score}</div><div style="color:var(--muted);margin-top:6px;">очков</div></div>`;
+      return;
+    }
+    rafId = requestAnimationFrame(loop);
+  }
+
+  nextTarget();
+  rafId = requestAnimationFrame(loop);
+  return {
+    cleanup: () => {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      mapEl.removeEventListener('click', onMapClick);
+    }
+  };
+}
+
+// ─── Timeline: расставь события в хронологическом порядке ───
+const TIMELINE_SETS = [
+  [{e:'Изобретение колеса', y:-3500}, {e:'Первая Олимпиада', y:-776}, {e:'Падение Рима', y:476}, {e:'Открытие Америки', y:1492}],
+  [{e:'Наполеоновские войны', y:1812}, {e:'Октябрьская революция', y:1917}, {e:'Первая мировая война', y:1914}, {e:'Вторая мировая', y:1939}],
+  [{e:'Первый автомобиль', y:1886}, {e:'Первый полёт братьев Райт', y:1903}, {e:'Первый телефон', y:1876}, {e:'Лампа Эдисона', y:1879}],
+  [{e:'Первый человек в космосе', y:1961}, {e:'Высадка на Луну', y:1969}, {e:'Запуск Спутника', y:1957}, {e:'МКС запущена', y:1998}],
+  [{e:'Появление Facebook', y:2004}, {e:'Первый iPhone', y:2007}, {e:'Появление YouTube', y:2005}, {e:'Появление Google', y:1998}],
+  [{e:'Появление Instagram', y:2010}, {e:'Запуск TikTok', y:2016}, {e:'Появление WhatsApp', y:2009}, {e:'Первый пост в Twitter', y:2006}],
+  [{e:'Первые Олимпийские игры современности', y:1896}, {e:'Первая ракета V-2', y:1944}, {e:'Открытие пенициллина', y:1928}, {e:'Падение Берлинской стены', y:1989}],
+  [{e:'Распад СССР', y:1991}, {e:'Русская революция', y:1917}, {e:'Куликовская битва', y:1380}, {e:'Крещение Руси', y:988}],
+];
+
+function startTimelineGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="math-area" id="tl" style="overflow:hidden;">
+      <div class="math-hud">📅 <span id="tl-score">0</span> ✓ • <span id="tl-wrong">0</span> ✗ • <span id="tl-time">30.0</span>s</div>
+      <div style="position:absolute;top:48px;left:0;right:0;text-align:center;color:var(--muted);font-size:12px;">Тапай события в порядке от самого древнего к новому</div>
+      <div id="tl-events" style="position:absolute;top:82px;left:16px;right:16px;display:flex;flex-direction:column;gap:10px;"></div>
+      <div id="tl-ordered" style="position:absolute;bottom:16px;left:16px;right:16px;display:flex;gap:6px;flex-wrap:wrap;min-height:40px;padding:8px;background:var(--panel2);border-radius:10px;border:1px dashed var(--border);font-size:11px;"></div>
+    </div>
+  `;
+  const DURATION = 30000;
+  const t0 = performance.now();
+  let score = 0, wrong = 0, finished = false, rafId = null;
+  let currentSet = null;
+  let ordered = [];  // уже отправленные игроком (в порядке кликов)
+
+  function nextSet() {
+    currentSet = TIMELINE_SETS[Math.floor(Math.random() * TIMELINE_SETS.length)].slice()
+      .sort(() => Math.random() - 0.5);  // перемешанный набор
+    ordered = [];
+    renderEvents();
+    $('tl-ordered').innerHTML = '<span style="color:var(--muted);">Твой порядок появится здесь</span>';
+  }
+
+  function renderEvents() {
+    const evs = $('tl-events');
+    evs.innerHTML = '';
+    currentSet.forEach(ev => {
+      const btn = document.createElement('button');
+      btn.className = 'math-opt';
+      btn.style.cssText = 'font-size:13px;padding:12px 10px;text-align:left;';
+      btn.textContent = ev.e;
+      btn.addEventListener('click', () => clickEvent(ev, btn));
+      evs.appendChild(btn);
     });
   }
 
-  const loop = () => {
+  function clickEvent(ev, btn) {
     if (finished) return;
-    const left = Math.max(0, DURATION - (performance.now() - t0));
-    $('trv-time').textContent = (left / 1000).toFixed(1);
-    if (left <= 0) { finished = true; cancelAnimationFrame(rafId);
-      sendResult(correct - wrong, performance.now() - t0);
-      $('trv').innerHTML = `<div style="text-align:center;color:white;"><div style="font-size:48px;font-weight:800;">${correct - wrong}</div><div style="color:var(--muted);margin-top:6px;">${correct} верно, ${wrong} ошибок</div></div>`; return; }
+    btn.disabled = true; btn.style.opacity = '0.4';
+    ordered.push(ev);
+    // Обновляем строку заказа
+    $('tl-ordered').innerHTML = ordered.map((o, i) =>
+      `<span style="background:var(--panel);border:1px solid var(--border);padding:4px 8px;border-radius:6px;">${i + 1}. ${o.e}</span>`
+    ).join(' ');
+    // Когда все 4 выбраны — оцениваем
+    if (ordered.length === currentSet.length) {
+      const correctOrder = [...currentSet].sort((a, b) => a.y - b.y);
+      const isCorrect = ordered.every((o, i) => o.y === correctOrder[i].y);
+      if (isCorrect) { score++; $('tl-score').textContent = score; hap('success'); }
+      else { wrong++; $('tl-wrong').textContent = wrong; hap('error'); }
+      setTimeout(() => { if (!finished) nextSet(); }, 900);
+    }
+  }
+
+  function loop(now) {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (now - t0));
+    $('tl-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      sendResult(score - wrong, now - t0);
+      $('tl').innerHTML = `<div style="text-align:center;color:white;"><div style="font-size:56px;font-weight:800;">${score - wrong}</div><div style="color:var(--muted);margin-top:6px;">${score} верно, ${wrong} ошибок</div></div>`;
+      return;
+    }
     rafId = requestAnimationFrame(loop);
-  };
-  next(); rafId = requestAnimationFrame(loop);
+  }
+
+  nextSet();
+  rafId = requestAnimationFrame(loop);
   return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
 }
 
@@ -3656,17 +4024,16 @@ function startMiniGame(gameId) {
   else if (gameId === 'stroop') currentGame = startStroopGame();
   else if (gameId === 'memory') currentGame = startMemoryGame();
   else if (gameId === 'spatial') currentGame = startSpatialGame();
-  else if (gameId === 'audio') currentGame = startAudioGame();
   else if (gameId === 'rhythm') currentGame = startRhythmGame();
-  else if (gameId === 'balance') currentGame = startBalanceGame();
+  else if (gameId === 'balance') currentGame = startGolfGame();
   else if (gameId === 'quick_draw') currentGame = startQuickDrawGame();
   else if (gameId === 'number_chain') currentGame = startNumberChainGame();
   else if (gameId === 'visual_memory') currentGame = startVisualMemoryGame();
   else if (gameId === 'word_memory') currentGame = startWordMemoryGame();
-  else if (gameId === 'trivia_geo') currentGame = startTriviaGame('geo');
-  else if (gameId === 'trivia_science') currentGame = startTriviaGame('science');
-  else if (gameId === 'trivia_history') currentGame = startTriviaGame('history');
-  else if (gameId === 'trivia_pop') currentGame = startTriviaGame('pop');
+  else if (gameId === 'flags_rain') currentGame = startFlagsRainGame();
+  else if (gameId === 'sort_zones') currentGame = startSortZonesGame();
+  else if (gameId === 'map_tap') currentGame = startMapTapGame();
+  else if (gameId === 'timeline') currentGame = startTimelineGame();
   else {
     // Неизвестная игра — возможно, старый кэш браузера. Показываем подсказку.
     console.error('Unknown mini-game:', gameId);
@@ -4619,113 +4986,6 @@ function startSpatialGame() {
   return { cleanup: () => { finished = true; clearTimeout(hardTimer); cancelAnimationFrame(rafId); } };
 }
 
-// ─── Audio Reflex ───
-function startAudioGame() {
-  const area = $('game-area');
-  area.innerHTML = `
-    <div class="audio-area" id="aud">
-      <div class="audio-visual" id="aud-vis">🔇</div>
-      <div class="audio-big" id="aud-big">Жди сигнал...</div>
-      <div class="audio-hint">Сейчас раздастся звук. Кликни МОМЕНТАЛЬНО.</div>
-      <div class="audio-attempts" id="aud-list"></div>
-    </div>
-  `;
-  const ATTEMPTS = 3;
-  let attempt = 0;
-  let attempts = [];
-  const t0 = performance.now();
-  let waiting = false;
-  let timerId = null;
-  let showTs = 0;
-  let audioCtx = null;
-  let finished = false;
-  const el = $('aud');
-
-  // Инициализируем аудио-контекст при первом взаимодействии
-  function ensureCtx() {
-    if (audioCtx) return;
-    try {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    } catch (e) {}
-  }
-  function beep() {
-    if (!audioCtx) return;
-    try {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
-      osc.connect(gain); gain.connect(audioCtx.destination);
-      osc.start(); osc.stop(audioCtx.currentTime + 0.25);
-    } catch (e) {}
-  }
-
-  function scheduleNext() {
-    attempt++;
-    if (attempt > ATTEMPTS) { finish(); return; }
-    el.classList.remove('go', 'early');
-    $('aud-vis').textContent = '🔇';
-    $('aud-big').textContent = 'Жди сигнал...';
-    waiting = false;
-    const delay = 1500 + Math.random() * 3500;
-    timerId = setTimeout(() => {
-      ensureCtx(); beep();
-      el.classList.add('go');
-      $('aud-vis').textContent = '🔊';
-      $('aud-big').textContent = '!';
-      showTs = performance.now();
-      waiting = true;
-      hap('tap');
-    }, delay);
-  }
-  function pointsForRt(rt, isFalseStart) {
-    if (isFalseStart) return -1;
-    if (rt < 300) return 2;
-    if (rt < 500) return 1;
-    return 0;
-  }
-  function renderList() {
-    $('aud-list').textContent = attempts.map(a => a.fs ? 'фальстарт' : Math.round(a.rt) + 'мс').join(' • ');
-  }
-  function onClick() {
-    ensureCtx();
-    if (!waiting && !el.classList.contains('go')) {
-      hap('error');
-      clearTimeout(timerId);
-      el.classList.add('early');
-      $('aud-big').textContent = 'Рано! −1 балл';
-      attempts.push({ rt: 0, points: -1, fs: true });
-      renderList();
-      setTimeout(() => { if (!finished) scheduleNext(); }, 700);
-      return;
-    }
-    if (waiting) {
-      hap('success');
-      const rt = performance.now() - showTs;
-      const p = pointsForRt(rt, false);
-      attempts.push({ rt, points: p, fs: false });
-      waiting = false;
-      el.classList.remove('go');
-      $('aud-big').textContent = Math.round(rt) + ' мс  ' + (p > 0 ? '+' + p : '0');
-      renderList();
-      setTimeout(() => { if (!finished) scheduleNext(); }, 700);
-    }
-  }
-  function finish() {
-    if (finished) return;
-    finished = true;
-    const total = attempts.reduce((sum, a) => sum + a.points, 0);
-    const elapsed = performance.now() - t0;
-    sendResult(total, elapsed);
-    $('aud-big').textContent = 'Итог: ' + total;
-  }
-  el.addEventListener('click', onClick);
-  scheduleNext();
-  return { cleanup: () => { finished = true; clearTimeout(timerId); el.removeEventListener('click', onClick); try { audioCtx && audioCtx.close(); } catch(e){} } };
-}
-
 // ─── Rhythm ───
 function startRhythmGame() {
   const area = $('game-area');
@@ -4820,119 +5080,165 @@ function startRhythmGame() {
   return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
 }
 
-// ─── Balance ───
-function startBalanceGame() {
+// ─── Golf (раньше Balance) ───
+// Мяч лежит на поле, лунка в случайной точке. Тянешь палец ОТ мяча — появляется стрелка
+// (противоположное направление = сила удара). Отпустил — мяч летит, затухает от трения,
+// отскакивает от стенок. Попал в лунку — новая лунка, +1 балл.
+function startGolfGame() {
   const area = $('game-area');
   area.innerHTML = `
-    <div class="bal-area" id="bal">
-      <div class="bal-hud">⚖️ <span id="bal-score">0</span> сек в центре • <span id="bal-time">20.0</span>s</div>
-      <div class="bal-ring">
-        <div class="bal-target" id="bal-target"></div>
-        <div class="bal-ball" id="bal-ball"></div>
-      </div>
-      <div class="bal-hint">Держи палец ближе к центру кольца. Наклоняй экран или свайпай.</div>
+    <div class="math-area" id="gf" style="overflow:hidden;background:#0a2f14;touch-action:none;">
+      <div class="math-hud">⛳ <span id="gf-score">0</span> лунок • <span id="gf-time">30.0</span>s</div>
+      <svg id="gf-svg" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;">
+        <line id="gf-arrow" x1="0" y1="0" x2="0" y2="0" stroke="#ffb86b" stroke-width="4" stroke-linecap="round" stroke-dasharray="6 4" style="display:none;" />
+      </svg>
+      <div id="gf-hole" style="position:absolute;width:36px;height:36px;border-radius:50%;background:#000;border:3px solid #ffd740;box-shadow:0 0 16px rgba(255,215,64,0.6);transform:translate(-50%,-50%);"></div>
+      <div id="gf-ball" style="position:absolute;width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#e0e0e0);transform:translate(-50%,-50%);z-index:2;box-shadow:0 2px 6px rgba(0,0,0,0.5);"></div>
+      <div id="gf-hint" style="position:absolute;bottom:8px;left:0;right:0;text-align:center;color:var(--muted);font-size:11px;pointer-events:none;">Тяни палец ОТ мяча, чтобы ударить — чем дальше, тем сильнее</div>
     </div>
   `;
-  const DURATION = 20000;
+  const DURATION = 30000;
   const t0 = performance.now();
-  const ring = document.querySelector('.bal-ring');
-  const ball = $('bal-ball');
-  // Coordinates within ring, 0..1 where 0.5,0.5 = центр
-  let x = 0.5, y = 0.5;
-  let vx = 0, vy = 0;
-  let score = 0;
-  let finished = false;
-  let rafId = null;
-  let touchActive = false;
-  let touchX = 0.5, touchY = 0.5;
+  const gf = $('gf'); const ball = $('gf-ball'); const hole = $('gf-hole'); const arrow = $('gf-arrow');
+  let score = 0, finished = false, rafId = null;
+  // Координаты в пикселях (относительно gf-области)
+  let bx = 0, by = 0, vx = 0, vy = 0;
+  let hx = 0, hy = 0;  // позиция лунки
+  let dragging = false, dragStartX = 0, dragStartY = 0, dragX = 0, dragY = 0;
+  const BALL_R = 11, HOLE_R = 16;
 
-  function updateBallPos() {
-    const r = ring.getBoundingClientRect();
-    const cx = x * r.width;
-    const cy = y * r.height;
-    ball.style.left = cx + 'px';
-    ball.style.top = cy + 'px';
-    ball.style.transform = `translate(-50%, -50%)`;
+  function getArea() {
+    const r = gf.getBoundingClientRect();
+    return { w: r.width, h: r.height, top: r.top, left: r.left };
   }
-  updateBallPos();
+  function placeNewHole() {
+    const a = getArea();
+    // Лунка в произвольном месте но не слишком близко к мячу и не у края
+    for (let i = 0; i < 20; i++) {
+      const px = 40 + Math.random() * (a.w - 80);
+      const py = 100 + Math.random() * (a.h - 180);
+      if (Math.hypot(px - bx, py - by) > 120) {
+        hx = px; hy = py; break;
+      }
+    }
+    hole.style.left = hx + 'px'; hole.style.top = hy + 'px';
+  }
+  function placeBallInitial() {
+    const a = getArea();
+    bx = a.w / 2;
+    by = a.h - 80;
+    vx = 0; vy = 0;
+    ball.style.left = bx + 'px'; ball.style.top = by + 'px';
+  }
 
-  // Touch управление — игрок "тянет" шарик пальцем (смещение пальца от центра задаёт направление тяги)
-  const onTouch = (e) => {
-    e.preventDefault();
-    const t = e.touches ? e.touches[0] : e;
-    if (!t) return;
-    const r = ring.getBoundingClientRect();
-    touchX = (t.clientX - r.left) / r.width;
-    touchY = (t.clientY - r.top) / r.height;
-    touchActive = true;
-  };
-  const onTouchEnd = () => { touchActive = false; };
-  area.addEventListener('pointerdown', onTouch);
-  area.addEventListener('pointermove', onTouch);
-  area.addEventListener('pointerup', onTouchEnd);
-  area.addEventListener('pointercancel', onTouchEnd);
-
-  // Псевдо-гравитация: случайный дрейф усиливается со временем
-  let driftX = (Math.random() - 0.5) * 0.0004;
-  let driftY = (Math.random() - 0.5) * 0.0004;
-  let lastShuffle = t0;
-  let lastTickAt = t0;
-  let timeInCenterMs = 0;  // суммарное время когда шарик в центре
-
-  const tick = (now) => {
+  function onStart(e) {
     if (finished) return;
-    const elapsed = now - t0;
-    const dt = now - lastTickAt;
-    lastTickAt = now;
-    if (elapsed > DURATION) {
+    // Начинаем тянуть только если мяч не движется
+    if (Math.hypot(vx, vy) > 0.3) return;
+    const t = e.touches ? e.touches[0] : e;
+    const a = getArea();
+    const px = t.clientX - a.left;
+    const py = t.clientY - a.top;
+    // Близко к мячу?
+    if (Math.hypot(px - bx, py - by) > 80) return;
+    dragging = true;
+    dragStartX = px; dragStartY = py;
+    dragX = 0; dragY = 0;
+    e.preventDefault();
+  }
+  function onMove(e) {
+    if (!dragging) return;
+    const t = e.touches ? e.touches[0] : e;
+    const a = getArea();
+    const px = t.clientX - a.left;
+    const py = t.clientY - a.top;
+    dragX = px - dragStartX; dragY = py - dragStartY;
+    // Арроу в ПРОТИВОПОЛОЖНУЮ сторону (куда полетит мяч)
+    const maxLen = 120;
+    const len = Math.min(maxLen, Math.hypot(dragX, dragY));
+    const angle = Math.atan2(-dragY, -dragX);
+    const ax = bx + Math.cos(angle) * len;
+    const ay = by + Math.sin(angle) * len;
+    arrow.setAttribute('x1', bx); arrow.setAttribute('y1', by);
+    arrow.setAttribute('x2', ax); arrow.setAttribute('y2', ay);
+    arrow.style.display = 'block';
+    e.preventDefault();
+  }
+  function onEnd(e) {
+    if (!dragging) return;
+    dragging = false;
+    arrow.style.display = 'none';
+    // Сила удара: противоположно вектору перетаскивания
+    const power = Math.min(16, Math.hypot(dragX, dragY) * 0.12);
+    if (power < 1) return;  // слишком слабо
+    const angle = Math.atan2(-dragY, -dragX);
+    vx = Math.cos(angle) * power;
+    vy = Math.sin(angle) * power;
+    hap('heavy');
+  }
+  gf.addEventListener('pointerdown', onStart);
+  gf.addEventListener('pointermove', onMove);
+  gf.addEventListener('pointerup', onEnd);
+  gf.addEventListener('pointercancel', onEnd);
+
+  function loop(now) {
+    if (finished) return;
+    const a = getArea();
+    const left = Math.max(0, DURATION - (now - t0));
+    $('gf-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
       finished = true;
       cancelAnimationFrame(rafId);
-      const sec = Math.floor(timeInCenterMs / 1000);
-      sendResult(sec, elapsed);
+      sendResult(score, now - t0);
+      gf.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;"><div style="font-size:56px;font-weight:800;">${score}</div><div style="color:var(--muted);margin-top:6px;">лунок забито</div></div>`;
       return;
     }
-    // Смена дрейфа каждые 2.5 сек
-    if (now - lastShuffle > 2500) {
-      driftX = (Math.random() - 0.5) * (0.0006 + elapsed / DURATION * 0.0008);
-      driftY = (Math.random() - 0.5) * (0.0006 + elapsed / DURATION * 0.0008);
-      lastShuffle = now;
+
+    // Движение мяча
+    if (Math.hypot(vx, vy) > 0.3) {
+      bx += vx; by += vy;
+      // Трение
+      vx *= 0.97; vy *= 0.97;
+      // Отскок от стенок
+      if (bx < BALL_R) { bx = BALL_R; vx = -vx * 0.7; }
+      if (bx > a.w - BALL_R) { bx = a.w - BALL_R; vx = -vx * 0.7; }
+      if (by < 70) { by = 70; vy = -vy * 0.7; }
+      if (by > a.h - BALL_R - 20) { by = a.h - BALL_R - 20; vy = -vy * 0.7; }
+      ball.style.left = bx + 'px'; ball.style.top = by + 'px';
+
+      // Проверка попадания в лунку
+      if (Math.hypot(bx - hx, by - hy) < HOLE_R) {
+        score++; $('gf-score').textContent = score;
+        hap('success');
+        playVictoryVfx('stars');
+        // Сбрасываем мяч и новая лунка
+        vx = 0; vy = 0;
+        placeBallInitial();
+        setTimeout(() => { if (!finished) placeNewHole(); }, 100);
+      }
+    } else if (Math.abs(vx) > 0.01 || Math.abs(vy) > 0.01) {
+      // остановка
+      vx = 0; vy = 0;
     }
-    // Тяга к пальцу
-    if (touchActive) {
-      const targetX = Math.min(1, Math.max(0, touchX));
-      const targetY = Math.min(1, Math.max(0, touchY));
-      vx += (targetX - x) * 0.02;
-      vy += (targetY - y) * 0.02;
-    }
-    // Добавляем дрейф
-    vx += driftX;
-    vy += driftY;
-    // Трение
-    vx *= 0.93; vy *= 0.93;
-    x += vx; y += vy;
-    // Границы
-    x = Math.max(0.05, Math.min(0.95, x));
-    y = Math.max(0.05, Math.min(0.95, y));
-    updateBallPos();
-    // В центре (dist < 0.18) — накапливаем время в мс
-    const dist = Math.hypot(x - 0.5, y - 0.5);
-    if (dist < 0.18) {
-      timeInCenterMs += dt;
-      $('bal-score').textContent = Math.floor(timeInCenterMs / 1000);
-    }
-    $('bal-time').textContent = ((DURATION - elapsed) / 1000).toFixed(1);
-    rafId = requestAnimationFrame(tick);
-  };
-  rafId = requestAnimationFrame(tick);
+
+    rafId = requestAnimationFrame(loop);
+  }
+
+  // Инициализация после отрисовки — нужны точные размеры
+  setTimeout(() => {
+    placeBallInitial();
+    placeNewHole();
+    rafId = requestAnimationFrame(loop);
+  }, 50);
 
   return {
     cleanup: () => {
       finished = true;
       cancelAnimationFrame(rafId);
-      area.removeEventListener('pointerdown', onTouch);
-      area.removeEventListener('pointermove', onTouch);
-      area.removeEventListener('pointerup', onTouchEnd);
-      area.removeEventListener('pointercancel', onTouchEnd);
+      gf.removeEventListener('pointerdown', onStart);
+      gf.removeEventListener('pointermove', onMove);
+      gf.removeEventListener('pointerup', onEnd);
+      gf.removeEventListener('pointercancel', onEnd);
     }
   };
 }
