@@ -763,10 +763,29 @@
       100% { transform: scale(3); opacity: 0; }
     }
 
+    /* ── Глобальный фикс модалок на iPhone: учитываем safe-area ── */
+    /* Любая fixed-overlay получает отступы от нотча и нижней индикаторной полосы */
+    .bp-overlay,
+    .auth-modal-overlay,
+    #claim-modal,
+    #onboard-modal {
+      padding-top: calc(20px + env(safe-area-inset-top)) !important;
+      padding-bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+      padding-left: max(20px, env(safe-area-inset-left)) !important;
+      padding-right: max(20px, env(safe-area-inset-right)) !important;
+    }
+
+    /* Кнопка "✕" на модалках — делаем её крупной и легко тапабельной, уводим от статус-бара */
+    .bp-inner .bp-head button,
+    .auth-modal .close-x {
+      min-width: 40px; min-height: 40px;
+      font-size: 20px;
+    }
+
     /* ── Battle Pass UI ── */
     .bp-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 3000;
-      display: none; align-items: center; justify-content: center; padding: 20px;
+      display: none; align-items: center; justify-content: center;
     }
     .bp-overlay.open { display: flex; }
     .bp-inner {
