@@ -141,147 +141,147 @@ MAX_QUEUE_WAIT = 60
 RECONNECT_GRACE_SEC = 30.0       # даём 30 секунд на реконнект (мобилки после unbackground долго восстанавливают WS)
 AI_OFFER_AFTER_SEC = 20          # если нет соперника столько секунд — предлагаем AI
 
+# Счёт внутри мини-игр = человеческие единицы (правильных ответов / попаданий / длина / пары).
+# За ошибки может быть штраф (-1 балл), поэтому score может быть отрицательным.
+# max_score ограничивает сверху — защита от cheat'еров. min_score = -max_score.
 GAMES = {
     "react": {
         "name": "Реакция",
-        "desc": "Кликни максимально быстро, когда экран станет зелёным (5 попыток).",
-        "max_score": 5000,
+        "desc": "Кликни максимально быстро, когда экран станет зелёным (5 попыток). Фальстарт -1.",
+        "max_score": 20,   # 5 попыток × до 2 очков + margin
         "min_elapsed_ms": 2000,
         "max_elapsed_ms": 60000,
     },
     "aim": {
         "name": "Снайпер",
         "desc": "За 15 секунд попади в максимум мишеней.",
-        "max_score": 10000,
+        "max_score": 100,
         "min_elapsed_ms": 14500,
         "max_elapsed_ms": 16500,
     },
     "sequence": {
         "name": "Последовательность",
-        "desc": "Повтори последовательность, которая становится длиннее.",
-        "max_score": 5000,
+        "desc": "Каждый раунд — новая последовательность, но на 1 длиннее. Повтори её.",
+        "max_score": 30,
         "min_elapsed_ms": 1500,
         "max_elapsed_ms": 60000,
     },
     "math": {
         "name": "Устный счёт",
-        "desc": "За 20 секунд реши максимум арифметических примеров.",
-        "max_score": 10000,   # ~50 правильных × 200
+        "desc": "За 20 секунд реши максимум примеров. Правильный = +1, ошибка = −1.",
+        "max_score": 50,
         "min_elapsed_ms": 19500,
         "max_elapsed_ms": 21000,
     },
     "odd": {
         "name": "Найди отличие",
-        "desc": "В сетке один квадрат слегка другого цвета. Найди его — и так за 20 сек.",
-        "max_score": 10000,
+        "desc": "В сетке один квадрат слегка другого цвета. Найди +1, ошибка −1. 20 сек.",
+        "max_score": 50,
         "min_elapsed_ms": 19500,
         "max_elapsed_ms": 21000,
     },
     "typing": {
         "name": "Скорость печати",
-        "desc": "Печатай слова как можно быстрее. У тебя 20 секунд.",
-        "max_score": 10000,
+        "desc": "Печатай слова как можно быстрее. Засчитывается за точность. 20 сек.",
+        "max_score": 50,
         "min_elapsed_ms": 19500,
         "max_elapsed_ms": 21000,
     },
     "stroop": {
         "name": "Строп-тест",
-        "desc": "Кликай по ЦВЕТУ, которым написано слово (не по значению слова!).",
-        "max_score": 10000,
+        "desc": "Кликай по ЦВЕТУ слова (не по значению!). Правильный +1, ошибка −1.",
+        "max_score": 50,
         "min_elapsed_ms": 19500,
         "max_elapsed_ms": 21000,
     },
     "memory": {
         "name": "Память",
-        "desc": "Найди максимум пар одинаковых карт за 30 секунд.",
-        "max_score": 10000,
+        "desc": "Найди максимум пар за 30 секунд.",
+        "max_score": 30,
         "min_elapsed_ms": 3000,
         "max_elapsed_ms": 32000,
     },
     "spatial": {
         "name": "Пространственная память",
-        "desc": "Запомни подсвеченные клетки за 1 секунду и воспроизведи. Сетка растёт.",
-        "max_score": 10000,
+        "desc": "Запомни подсвеченные клетки. Каждый уровень = +1 балл.",
+        "max_score": 30,
         "min_elapsed_ms": 2000,
         "max_elapsed_ms": 60000,
     },
     "audio": {
         "name": "Слух",
-        "desc": "Кликай, когда услышишь сигнал. Фальстарт = штраф.",
-        "max_score": 5000,
+        "desc": "Кликай когда услышишь сигнал (3 попытки). Фальстарт −1.",
+        "max_score": 10,
         "min_elapsed_ms": 4000,
         "max_elapsed_ms": 30000,
     },
     "rhythm": {
         "name": "Ритм",
-        "desc": "Кликай в такт метронома. Чем точнее — тем выше счёт.",
-        "max_score": 10000,
+        "desc": "Тапай в такт метронома. Точно = +1, мимо = 0.",
+        "max_score": 50,
         "min_elapsed_ms": 15000,
         "max_elapsed_ms": 22000,
     },
     "balance": {
         "name": "Баланс",
-        "desc": "Удерживай шарик в центре кольца 20 секунд.",
-        "max_score": 10000,
+        "desc": "Удерживай шарик в центре кольца. Очко = секунда в центре.",
+        "max_score": 30,
         "min_elapsed_ms": 19500,
         "max_elapsed_ms": 21000,
     },
     "quick_draw": {
         "name": "Быстрый штрих",
-        "desc": "Соединяй точки по порядку 1→2→3. Быстрее — больше очков.",
-        "max_score": 10000,
+        "desc": "Соединяй точки по порядку 1→2→3. Каждая точка = +1 балл.",
+        "max_score": 25,
         "min_elapsed_ms": 3000,
         "max_elapsed_ms": 30000,
     },
-    # ── Логика (новая) ──
     "number_chain": {
         "name": "Числовая цепочка",
-        "desc": "Найди закономерность: 2, 4, 8, ? — кликни правильный ответ.",
-        "max_score": 10000,
+        "desc": "Найди закономерность: 2, 4, 8, ? — правильный +1, ошибка −1.",
+        "max_score": 50,
         "min_elapsed_ms": 19500,
         "max_elapsed_ms": 21000,
     },
-    # ── Память (2 новые) ──
     "visual_memory": {
         "name": "Визуальная память",
-        "desc": "Показали картинку из эмодзи на 3 сек. Потом спрашиваем — какой был? 10 раундов.",
-        "max_score": 10000,
+        "desc": "Запомни эмодзи за 2 сек. Правильный +1, ошибка −1. 10 раундов.",
+        "max_score": 12,
         "min_elapsed_ms": 10000,
         "max_elapsed_ms": 60000,
     },
     "word_memory": {
         "name": "Слова",
-        "desc": "Показали 5 слов. Потом — было ли это слово в списке? Сложность растёт.",
-        "max_score": 10000,
+        "desc": "Было ли это слово в списке? Правильный +1, ошибка −1.",
+        "max_score": 20,
         "min_elapsed_ms": 10000,
         "max_elapsed_ms": 60000,
     },
-    # ── Эрудиция (4 новые) ──
     "trivia_geo": {
         "name": "География",
-        "desc": "Столицы, флаги, достопримечательности. 20 секунд.",
-        "max_score": 10000,
+        "desc": "Столицы, флаги, достопримечательности. +1/−1. 20 сек.",
+        "max_score": 30,
         "min_elapsed_ms": 19500,
         "max_elapsed_ms": 21000,
     },
     "trivia_science": {
         "name": "Наука",
-        "desc": "Физика, химия, биология, космос. 20 секунд.",
-        "max_score": 10000,
+        "desc": "Физика, химия, биология, космос. +1/−1. 20 сек.",
+        "max_score": 30,
         "min_elapsed_ms": 19500,
         "max_elapsed_ms": 21000,
     },
     "trivia_history": {
         "name": "История",
-        "desc": "Даты, события, личности. 20 секунд.",
-        "max_score": 10000,
+        "desc": "Даты, события, личности. +1/−1. 20 сек.",
+        "max_score": 30,
         "min_elapsed_ms": 19500,
         "max_elapsed_ms": 21000,
     },
     "trivia_pop": {
         "name": "Поп-культура",
-        "desc": "Кино, музыка, интернет, мемы. 20 секунд.",
-        "max_score": 10000,
+        "desc": "Кино, музыка, интернет, мемы. +1/−1. 20 сек.",
+        "max_score": 30,
         "min_elapsed_ms": 19500,
         "max_elapsed_ms": 21000,
     },
@@ -315,42 +315,44 @@ CATEGORY_ELO_FIELD = {
 # AI-противник: для каждой мини-игры и сложности — среднее score + вариация
 # Фактическая формула: random(score - var, score + var)
 AI_PROFILES = {
+    # score в единицах (balls, правильных ответов, попаданий, уровней).
+    # (среднее, разброс) для каждой мини-игры.
     "easy": {
-        "react": (350, 150), "aim": (800, 250), "sequence": (300, 100),
-        "math": (1200, 400), "odd": (1000, 300),
-        "typing": (800, 300), "stroop": (1000, 300),
-        "memory": (600, 200), "spatial": (400, 150),
-        "audio": (1500, 500), "rhythm": (2500, 500),
-        "balance": (4000, 800), "quick_draw": (1500, 400),
-        "number_chain": (1200, 400), "visual_memory": (1200, 400), "word_memory": (1000, 300),
-        "trivia_geo": (1200, 400), "trivia_science": (1000, 400),
-        "trivia_history": (1000, 400), "trivia_pop": (1200, 400),
+        "react": (3, 2), "aim": (10, 4), "sequence": (3, 1),
+        "math": (6, 3), "odd": (5, 2),
+        "typing": (4, 2), "stroop": (5, 2),
+        "memory": (3, 2), "spatial": (2, 1),
+        "audio": (2, 1), "rhythm": (10, 3),
+        "balance": (3, 2), "quick_draw": (5, 2),
+        "number_chain": (5, 2), "visual_memory": (3, 2), "word_memory": (4, 2),
+        "trivia_geo": (5, 2), "trivia_science": (4, 2),
+        "trivia_history": (4, 2), "trivia_pop": (5, 2),
         "elo": 800, "nickname": "🤖 AI Новичок",
         "elapsed_factor": 0.9,
     },
     "medium": {
-        "react": (700, 200), "aim": (1800, 300), "sequence": (600, 150),
-        "math": (2400, 400), "odd": (2000, 300),
-        "typing": (1800, 400), "stroop": (2200, 300),
-        "memory": (1400, 300), "spatial": (900, 200),
-        "audio": (2800, 500), "rhythm": (5000, 600),
-        "balance": (6500, 700), "quick_draw": (3000, 400),
-        "number_chain": (2800, 500), "visual_memory": (2400, 400), "word_memory": (2200, 400),
-        "trivia_geo": (2800, 400), "trivia_science": (2400, 500),
-        "trivia_history": (2400, 500), "trivia_pop": (2800, 400),
+        "react": (6, 2), "aim": (22, 4), "sequence": (5, 1),
+        "math": (12, 3), "odd": (12, 3),
+        "typing": (9, 2), "stroop": (12, 3),
+        "memory": (7, 2), "spatial": (5, 1),
+        "audio": (4, 1), "rhythm": (22, 4),
+        "balance": (8, 2), "quick_draw": (12, 3),
+        "number_chain": (12, 3), "visual_memory": (6, 2), "word_memory": (10, 3),
+        "trivia_geo": (12, 3), "trivia_science": (10, 3),
+        "trivia_history": (10, 3), "trivia_pop": (12, 3),
         "elo": 1000, "nickname": "🤖 AI Средний",
         "elapsed_factor": 1.0,
     },
     "hard": {
-        "react": (1100, 200), "aim": (2800, 300), "sequence": (900, 150),
-        "math": (3600, 400), "odd": (3200, 300),
-        "typing": (3000, 400), "stroop": (3400, 300),
-        "memory": (2200, 300), "spatial": (1500, 250),
-        "audio": (4000, 500), "rhythm": (8000, 600),
-        "balance": (8500, 600), "quick_draw": (5000, 400),
-        "number_chain": (4200, 500), "visual_memory": (3800, 400), "word_memory": (3400, 400),
-        "trivia_geo": (4000, 400), "trivia_science": (3600, 500),
-        "trivia_history": (3600, 500), "trivia_pop": (4000, 400),
+        "react": (10, 2), "aim": (35, 5), "sequence": (8, 1),
+        "math": (20, 3), "odd": (22, 3),
+        "typing": (15, 3), "stroop": (20, 3),
+        "memory": (12, 2), "spatial": (10, 2),
+        "audio": (6, 1), "rhythm": (35, 4),
+        "balance": (14, 2), "quick_draw": (18, 3),
+        "number_chain": (22, 3), "visual_memory": (9, 1), "word_memory": (14, 2),
+        "trivia_geo": (20, 3), "trivia_science": (18, 3),
+        "trivia_history": (18, 3), "trivia_pop": (20, 3),
         "elo": 1300, "nickname": "🤖 AI Мастер",
         "elapsed_factor": 1.0,
     },
@@ -618,8 +620,10 @@ class ReflexRoom:
                 elapsed_ms = int(elapsed_ms)
             except Exception:
                 elapsed_ms = 0
-            if score < 0 or score > cfg["max_score"]:
-                score = 0
+            # Допускаем отрицательные score (штраф за ошибки), но не больше max_score по модулю
+            max_s = cfg["max_score"]
+            if score > max_s: score = max_s
+            if score < -max_s: score = -max_s
             if elapsed_ms < cfg["min_elapsed_ms"]:
                 score = 0
             if elapsed_ms > cfg["max_elapsed_ms"]:

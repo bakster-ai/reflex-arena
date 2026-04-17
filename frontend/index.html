@@ -1421,16 +1421,8 @@
       <div class="lobby">
         <div class="panel">
           <h3>Рейтинговый матч</h3>
-          <div style="color:var(--muted);font-size:12px;margin-bottom:10px;">Best of 5 • случайные мини-игры • победитель забирает банк.</div>
-          <div class="stake-row" id="stake-row">
-            <button class="stake-btn selected" data-stake="0">Бесплатно</button>
-            <button class="stake-btn" data-stake="10">10 💰</button>
-            <button class="stake-btn" data-stake="50">50 💰</button>
-            <button class="stake-btn" data-stake="200">200 💰</button>
-          </div>
-          <input class="stake-custom" id="stake-custom" type="number" min="0" max="1000" placeholder="Своя ставка (0–1000)" />
+          <div style="color:var(--muted);font-size:12px;margin-bottom:10px;">Best of 5 • случайные мини-игры • +20 💰 и ELO за победу.</div>
           <button class="play-btn" id="play-btn" onclick="findMatch()">Найти матч</button>
-          <button class="play-btn" onclick="findDeathmatch()" style="background:linear-gradient(90deg,#ff4d6d,#ff7a29);color:#fff;margin-top:8px;box-shadow:0 6px 20px rgba(255,77,109,0.35);">💀 Deathmatch Bo15 (≥200 💰)</button>
         </div>
 
         <div class="panel">
@@ -2369,14 +2361,14 @@ function startNumberChainGame() {
   const area = $('game-area');
   area.innerHTML = `
     <div class="math-area" id="nc">
-      <div class="math-hud">🔗 <span id="nc-correct">0</span> верно • <span id="nc-time">20.0</span>s</div>
+      <div class="math-hud">🔗 <span id="nc-correct">0</span> ✓ • <span id="nc-wrong">0</span> ✗ • <span id="nc-time">20.0</span>s</div>
       <div class="math-expr" id="nc-seq" style="font-size:36px;">—</div>
       <div class="math-options" id="nc-opts"></div>
     </div>
   `;
   const DURATION = 20000;
   const t0 = performance.now();
-  let correct = 0, finished = false, rafId = null, lock = false;
+  let correct = 0, wrong = 0, finished = false, rafId = null, lock = false;
 
   function genChain() {
     // Простые закономерности: +N, ×2, ×2+1, степени
@@ -2407,7 +2399,7 @@ function startNumberChainGame() {
       btn.textContent = v;
       btn.addEventListener('click', () => { if (lock) return; lock = true;
         if (v === ans) { correct++; $('nc-correct').textContent = correct; btn.classList.add('correct'); hap('success'); }
-        else { btn.classList.add('wrong'); hap('error'); }
+        else { wrong++; $('nc-wrong').textContent = wrong; btn.classList.add('wrong'); hap('error'); }
         setTimeout(() => { lock = false; if (!finished) next(); }, 300);
       });
       optsEl.appendChild(btn);
@@ -2419,8 +2411,8 @@ function startNumberChainGame() {
     const left = Math.max(0, DURATION - (performance.now() - t0));
     $('nc-time').textContent = (left / 1000).toFixed(1);
     if (left <= 0) { finished = true; cancelAnimationFrame(rafId);
-      sendResult(correct * 300, performance.now() - t0);
-      $('nc').innerHTML = `<div style="text-align:center;color:white;"><div style="font-size:48px;font-weight:800;">${correct}</div><div style="color:var(--muted);margin-top:6px;">правильных</div></div>`; return; }
+      sendResult(correct - wrong, performance.now() - t0);
+      $('nc').innerHTML = `<div style="text-align:center;color:white;"><div style="font-size:48px;font-weight:800;">${correct - wrong}</div><div style="color:var(--muted);margin-top:6px;">${correct} верно, ${wrong} ошибок</div></div>`; return; }
     rafId = requestAnimationFrame(loop);
   };
   next(); rafId = requestAnimationFrame(loop);
@@ -2431,24 +2423,22 @@ function startNumberChainGame() {
 function startVisualMemoryGame() {
   const area = $('game-area');
   area.innerHTML = `<div class="math-area" id="vm">
-    <div class="math-hud">🖼️ Раунд <span id="vm-round">1</span> • <span id="vm-score">0</span> очков</div>
+    <div class="math-hud">🖼️ Раунд <span id="vm-round">1</span>/10 • <span id="vm-correct">0</span> ✓ • <span id="vm-wrong">0</span> ✗</div>
     <div id="vm-content" style="font-size:80px;margin-bottom:24px;"></div>
     <div class="math-options" id="vm-opts"></div>
   </div>`;
   const POOL = ['🦊','🐉','🦅','🐺','🦁','🐸','🦈','🐙','🦂','🐢','🦇','🐧','🦉','🦜','🦩','🐻','🐼','🦄','🐲','🐵','🐶','🐱','🐷','🦀','🐝','🦋','🐞','🐨','🐻‍❄️','🦒'];
   const ROUNDS = 10;
-  let round = 0, score = 0, finished = false;
+  let round = 0, correct = 0, wrong = 0, finished = false;
   const t0 = performance.now();
 
   function nextRound() {
     round++;
     if (round > ROUNDS || finished) { finish(); return; }
     $('vm-round').textContent = round;
-    // Показываем случайный эмодзи
     const target = POOL[Math.floor(Math.random() * POOL.length)];
     $('vm-content').textContent = target;
     $('vm-opts').innerHTML = '';
-    // Через 2 сек — прячем и даём варианты
     setTimeout(() => {
       if (finished) return;
       $('vm-content').textContent = '❓';
@@ -2461,8 +2451,8 @@ function startVisualMemoryGame() {
         btn.className = 'math-opt'; btn.style.fontSize = '36px';
         btn.textContent = v;
         btn.addEventListener('click', () => {
-          if (v === target) { score += 200; $('vm-score').textContent = score; hap('success'); }
-          else { hap('error'); }
+          if (v === target) { correct++; $('vm-correct').textContent = correct; hap('success'); }
+          else { wrong++; $('vm-wrong').textContent = wrong; hap('error'); }
           setTimeout(() => nextRound(), 300);
         });
         optsEl.appendChild(btn);
@@ -2472,7 +2462,7 @@ function startVisualMemoryGame() {
 
   function finish() {
     if (finished) return; finished = true;
-    sendResult(score, performance.now() - t0);
+    sendResult(correct - wrong, performance.now() - t0);
   }
   nextRound();
   return { cleanup: () => { finished = true; } };
@@ -2482,24 +2472,22 @@ function startVisualMemoryGame() {
 function startWordMemoryGame() {
   const area = $('game-area');
   area.innerHTML = `<div class="math-area" id="wm">
-    <div class="math-hud">📝 <span id="wm-score">0</span> очков • <span id="wm-round">1</span></div>
+    <div class="math-hud">📝 <span id="wm-correct">0</span> ✓ • <span id="wm-wrong">0</span> ✗ • раунд <span id="wm-round">1</span>/15</div>
     <div id="wm-content" style="font-size:28px;max-width:340px;text-align:center;line-height:1.6;margin-bottom:24px;"></div>
     <div id="wm-btns" style="display:flex;gap:16px;"></div>
   </div>`;
   const WORDS = ['кошка','дерево','солнце','вода','книга','стол','дом','река','небо','снег','огонь','камень','дорога','звезда','мост','поезд','лес','город','свет','время','ветер','облако','цветок','песок','луна','рыба','птица','земля','музыка','мечта','тень','зеркало','лёд','дождь','гора','озеро','корабль','замок','ключ','сердце','молния','пустыня','бабочка','фонтан','робот','радуга','тигр','шторм','ракета','океан'];
-  let round = 0, score = 0, finished = false;
+  let round = 0, correct = 0, wrong = 0, finished = false;
   const t0 = performance.now();
 
   function nextRound() {
     round++;
     const listLen = Math.min(3 + Math.floor(round / 2), 8);
-    // Показываем список слов
     const pool = [...WORDS].sort(() => Math.random() - 0.5);
     const shown = pool.slice(0, listLen);
     $('wm-content').textContent = shown.join(' • ');
     $('wm-btns').innerHTML = '';
     $('wm-round').textContent = round;
-    // Через time — прячем и спрашиваем
     const showTime = Math.max(1500, 3000 - round * 150);
     setTimeout(() => {
       if (finished) return;
@@ -2514,9 +2502,9 @@ function startWordMemoryGame() {
         btn.className = 'math-opt'; btn.style.minWidth = '100px';
         btn.textContent = label;
         btn.addEventListener('click', () => {
-          const correct = (label === 'Да') === isInList;
-          if (correct) { score += 200; $('wm-score').textContent = score; hap('success'); }
-          else { hap('error'); }
+          const isCorrect = (label === 'Да') === isInList;
+          if (isCorrect) { correct++; $('wm-correct').textContent = correct; hap('success'); }
+          else { wrong++; $('wm-wrong').textContent = wrong; hap('error'); }
           if (round >= 15 || finished) { finish(); return; }
           setTimeout(() => nextRound(), 400);
         });
@@ -2525,7 +2513,7 @@ function startWordMemoryGame() {
     }, showTime);
   }
 
-  function finish() { if (finished) return; finished = true; sendResult(score, performance.now() - t0); }
+  function finish() { if (finished) return; finished = true; sendResult(correct - wrong, performance.now() - t0); }
   nextRound();
   return { cleanup: () => { finished = true; } };
 }
@@ -2536,13 +2524,13 @@ function startTriviaGame(category) {
   const catNames = { geo: 'География', science: 'Наука', history: 'История', pop: 'Поп-культура' };
   const catIcons = { geo: '🌍', science: '🔬', history: '📜', pop: '🎬' };
   area.innerHTML = `<div class="math-area" id="trv">
-    <div class="math-hud">${catIcons[category] || '❓'} <span id="trv-correct">0</span> верно • <span id="trv-time">20.0</span>s</div>
+    <div class="math-hud">${catIcons[category] || '❓'} <span id="trv-correct">0</span> ✓ • <span id="trv-wrong">0</span> ✗ • <span id="trv-time">20.0</span>s</div>
     <div id="trv-q" style="font-size:20px;font-weight:700;max-width:360px;text-align:center;margin-bottom:22px;padding:0 16px;line-height:1.4;"></div>
     <div class="math-options" id="trv-opts"></div>
   </div>`;
   const DURATION = 20000;
   const t0 = performance.now();
-  let correct = 0, finished = false, rafId = null, lock = false;
+  let correct = 0, wrong = 0, finished = false, rafId = null, lock = false;
   let usedIdx = new Set();
 
   // Загружаем вопросы из глобала (trivia_questions.js)
@@ -2580,8 +2568,8 @@ function startTriviaGame(category) {
         if (lock || finished) return; lock = true;
         if (a === correctAns) { correct++; $('trv-correct').textContent = correct; btn.classList.add('correct'); hap('success'); }
         else {
+          wrong++; $('trv-wrong').textContent = wrong;
           btn.classList.add('wrong'); hap('error');
-          // Подсветим правильный
           optsEl.querySelectorAll('.math-opt').forEach(b => { if (b.textContent === correctAns) b.classList.add('correct'); });
         }
         setTimeout(() => { if (!finished) next(); }, 400);
@@ -2595,8 +2583,8 @@ function startTriviaGame(category) {
     const left = Math.max(0, DURATION - (performance.now() - t0));
     $('trv-time').textContent = (left / 1000).toFixed(1);
     if (left <= 0) { finished = true; cancelAnimationFrame(rafId);
-      sendResult(correct * 300, performance.now() - t0);
-      $('trv').innerHTML = `<div style="text-align:center;color:white;"><div style="font-size:48px;font-weight:800;">${correct}</div><div style="color:var(--muted);margin-top:6px;">правильных</div></div>`; return; }
+      sendResult(correct - wrong, performance.now() - t0);
+      $('trv').innerHTML = `<div style="text-align:center;color:white;"><div style="font-size:48px;font-weight:800;">${correct - wrong}</div><div style="color:var(--muted);margin-top:6px;">${correct} верно, ${wrong} ошибок</div></div>`; return; }
     rafId = requestAnimationFrame(loop);
   };
   next(); rafId = requestAnimationFrame(loop);
@@ -3176,24 +3164,8 @@ async function loginAsGuest() {
   }
 }
 
-// ═════════════════════════════════════════════════════════════
-//   Stake selection
-// ═════════════════════════════════════════════════════════════
-document.querySelectorAll('.stake-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.stake-btn').forEach(b => b.classList.remove('selected'));
-    btn.classList.add('selected');
-    currentStake = parseInt(btn.dataset.stake, 10);
-    $('stake-custom').value = '';
-  });
-});
-$('stake-custom').addEventListener('input', (e) => {
-  const v = parseInt(e.target.value, 10);
-  if (!isNaN(v) && v >= 0 && v <= 1000) {
-    currentStake = v;
-    document.querySelectorAll('.stake-btn').forEach(b => b.classList.remove('selected'));
-  }
-});
+// Ставки сейчас отключены (матчмейкинг всегда stake=0)
+// Код "Stake selection" и findDeathmatch удалён.
 
 // ═════════════════════════════════════════════════════════════
 //   Matchmaking
@@ -3286,32 +3258,10 @@ async function tryAutoJoinRoom() {
   return true;
 }
 
-function findDeathmatch() {
-  if (!ME) return;
-  const stake = Math.max(200, currentStake);
-  if (stake > (ME.coins || 0)) {
-    alert('Нужно минимум 200 💰 для Deathmatch');
-    return;
-  }
-  showScreen('queue');
-  $('queue-stake').textContent = stake + ' 💀';
-  $('queue-time').textContent = '0';
-  queueStartTs = Date.now();
-  queueTimer = setInterval(() => {
-    $('queue-time').textContent = Math.floor((Date.now() - queueStartTs) / 1000);
-  }, 500);
-  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
-  const url = proto + location.host + '/ws/queue?token=' + encodeURIComponent(API.token());
-  ws = new WebSocket(url);
-  ws.onopen = () => ws.send(JSON.stringify({ type: 'queue', stake_coins: stake, mode: 'deathmatch' }));
-  ws.onmessage = (e) => { try { handleServerMsg(JSON.parse(e.data)); } catch (err) {} };
-  ws.onclose = handleWsCloseMaybeRejoin;
-}
-
 function playVsAi(difficulty) {
   if (!ME) return;
   showScreen('queue');
-  $('queue-stake').textContent = '0 (практика)';
+  $('queue-stake').textContent = 'практика';
   $('queue-time').textContent = '0';
   queueStartTs = Date.now();
   const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -3324,12 +3274,8 @@ function playVsAi(difficulty) {
 
 function findMatch() {
   if (!ME) return;
-  if (currentStake > (ME.coins || 0)) {
-    alert('Недостаточно монет для этой ставки');
-    return;
-  }
   showScreen('queue');
-  $('queue-stake').textContent = currentStake;
+  $('queue-stake').textContent = 'без ставки';
   $('queue-time').textContent = '0';
   queueStartTs = Date.now();
   queueTimer = setInterval(() => {
@@ -3341,7 +3287,7 @@ function findMatch() {
   ws = new WebSocket(url);
 
   ws.onopen = () => {
-    ws.send(JSON.stringify({ type: 'queue', stake_coins: currentStake }));
+    ws.send(JSON.stringify({ type: 'queue', stake_coins: 0 }));
   };
   ws.onmessage = (e) => {
     try { handleServerMsg(JSON.parse(e.data)); } catch (err) { console.error(err); }
@@ -3748,11 +3694,19 @@ function startReactGame() {
   const el = $('react');
   const ATTEMPTS = 5;
   let attempt = 0;
-  let attempts = [];
+  let attempts = [];  // [{rt:mouseMS, points:число}]
   const t0 = performance.now();
   let waitingForClick = false;
   let timerId = null;
   let showTs = 0;
+
+  // Очки за попытку: RT < 250мс = +2, RT < 400мс = +1, медленнее = 0, фальстарт = -1
+  function pointsForRt(rt, isFalseStart) {
+    if (isFalseStart) return -1;
+    if (rt < 250) return 2;
+    if (rt < 400) return 1;
+    return 0;
+  }
 
   function scheduleNext() {
     attempt++;
@@ -3781,8 +3735,8 @@ function startReactGame() {
       clearTimeout(timerId);
       el.classList.remove('wait', 'go');
       el.classList.add('early');
-      el.querySelector('.big').textContent = 'Рано! +500мс';
-      attempts.push(500);
+      el.querySelector('.big').textContent = 'Рано! −1 балл';
+      attempts.push({ rt: 0, points: -1, fs: true });
       renderList();
       setTimeout(() => scheduleNext(), 600);
       return;
@@ -3790,29 +3744,28 @@ function startReactGame() {
     if (waitingForClick) {
       hap('success');
       const rt = performance.now() - showTs;
-      attempts.push(rt);
+      const p = pointsForRt(rt, false);
+      attempts.push({ rt, points: p, fs: false });
       waitingForClick = false;
       el.classList.remove('go');
       el.classList.add('wait');
-      el.querySelector('.big').textContent = Math.round(rt) + ' мс';
+      el.querySelector('.big').textContent = Math.round(rt) + ' мс  ' + (p > 0 ? '+' + p : '0');
       renderList();
       setTimeout(() => scheduleNext(), 600);
     }
   }
 
   function renderList() {
-    $('ra-list').textContent = attempts.map(a => Math.round(a) + 'мс').join(' • ');
+    $('ra-list').textContent = attempts.map(a =>
+      a.fs ? 'фальстарт' : Math.round(a.rt) + 'мс'
+    ).join(' • ');
   }
 
   function finish() {
-    // Score: sum(max(0, 500 - rt)) * 2  →  очень быстрая реакция 200мс = 600 очков за попытку
-    let s = 0;
-    for (const rt of attempts) {
-      s += Math.max(0, 500 - Math.min(rt, 500)) * 2;
-    }
+    const total = attempts.reduce((sum, a) => sum + a.points, 0);
     const elapsed = performance.now() - t0;
-    sendResult(s, elapsed);
-    el.querySelector('.big').textContent = 'Готово! ' + Math.round(s);
+    sendResult(total, elapsed);
+    el.querySelector('.big').textContent = 'Итог: ' + total;
     el.querySelector('.small').textContent = 'Ждём результат соперника...';
   }
 
@@ -3887,7 +3840,7 @@ function startAimGame() {
       finished = true;
       cancelAnimationFrame(rafId);
       if (target) target.remove();
-      const score = hits * 100;
+      const score = hits;
       const elapsedMs = performance.now() - t0;
       sendResult(score, elapsedMs);
       el.innerHTML = `
@@ -3945,8 +3898,12 @@ function startSequenceGame() {
     }
   }, MAX_DURATION);
 
-  function addToSequence() {
-    sequence.push(COLORS[Math.floor(Math.random() * 4)]);
+  function regenerateSequence(newLen) {
+    // Каждый раунд — ПОЛНОСТЬЮ новая последовательность длины newLen
+    sequence = [];
+    for (let i = 0; i < newLen; i++) {
+      sequence.push(COLORS[Math.floor(Math.random() * 4)]);
+    }
   }
 
   function disableBtns(v) {
@@ -3990,7 +3947,7 @@ function startSequenceGame() {
     }
     userIdx++;
     if (userIdx >= sequence.length) {
-      // Успех — добавляем элемент
+      // Успех — следующий раунд: новая уникальная последовательность, длиннее на 1
       playing = false;
       maxLen = sequence.length;
       const elapsed = performance.now() - t0;
@@ -3998,7 +3955,7 @@ function startSequenceGame() {
         finish();
         return;
       }
-      addToSequence();
+      regenerateSequence(maxLen + 1);
       setTimeout(() => playSequence(), 500);
     }
   }
@@ -4018,14 +3975,14 @@ function startSequenceGame() {
     finished = true;
     playing = false;
     disableBtns(true);
-    const score = maxLen * 100;
+    const score = maxLen;
     const elapsed = performance.now() - t0;
     sendResult(score, elapsed);
-    $('seq-status').textContent = `Ошибка! Лучшая длина: ${maxLen}`;
+    $('seq-status').textContent = `Лучшая длина: ${maxLen}`;
   }
 
-  // Start
-  addToSequence();
+  // Start — начинаем с длины 1
+  regenerateSequence(1);
   playSequence();
 
   return {
@@ -4042,10 +3999,9 @@ function startMathGame() {
   const area = $('game-area');
   area.innerHTML = `
     <div class="math-area" id="math">
-      <div class="math-hud">🧮 <span id="math-correct">0</span> верно • <span id="math-time">20.0</span>s</div>
+      <div class="math-hud">🧮 <span id="math-correct">0</span> ✓ • <span id="math-wrong">0</span> ✗ • <span id="math-time">20.0</span>s</div>
       <div class="math-expr" id="math-expr">—</div>
       <div class="math-options" id="math-opts"></div>
-      <div class="math-stats"><span id="math-wrong">0</span> ошибок</div>
     </div>
   `;
   const DURATION = 20000;
@@ -4124,12 +4080,12 @@ function startMathGame() {
     if (left <= 0) {
       finished = true;
       cancelAnimationFrame(rafId);
-      const score = correct * 200;
+      const score = correct - wrong;
       sendResult(score, performance.now() - t0);
       $('math').innerHTML = `
         <div style="text-align:center;color:white;">
-          <div style="font-size:56px;font-weight:800;">${correct}</div>
-          <div style="color:var(--muted);margin-top:6px;">правильных</div>
+          <div style="font-size:56px;font-weight:800;">${score}</div>
+          <div style="color:var(--muted);margin-top:6px;">${correct} верно, ${wrong} ошибок</div>
           <div style="color:var(--muted);margin-top:20px;font-size:13px;">Ждём соперника...</div>
         </div>
       `;
@@ -4148,13 +4104,14 @@ function startOddGame() {
   const area = $('game-area');
   area.innerHTML = `
     <div class="odd-area" id="odd">
-      <div class="odd-hud">🔍 <span id="odd-found">0</span> найдено • <span id="odd-time">20.0</span>s</div>
+      <div class="odd-hud">🔍 <span id="odd-found">0</span> ✓ • <span id="odd-wrong">0</span> ✗ • <span id="odd-time">20.0</span>s</div>
       <div class="odd-grid" id="odd-grid"></div>
     </div>
   `;
   const DURATION = 20000;
   const t0 = performance.now();
   let found = 0;
+  let wrong = 0;
   let finished = false;
   let rafId = null;
   let lockInputs = false;
@@ -4216,9 +4173,10 @@ function startOddGame() {
       $('odd-found').textContent = found;
       setTimeout(() => { if (!finished) newRound(); }, 120);
     } else {
+      wrong++;
+      $('odd-wrong').textContent = wrong;
       btn.classList.add('odd-flash-wrong');
       setTimeout(() => btn.classList.remove('odd-flash-wrong'), 300);
-      // штраф: небольшой лок, но не пересоздаём раунд
       setTimeout(() => { lockInputs = false; }, 350);
     }
   }
@@ -4230,12 +4188,12 @@ function startOddGame() {
     if (left <= 0) {
       finished = true;
       cancelAnimationFrame(rafId);
-      const score = found * 200;
+      const score = found - wrong;
       sendResult(score, performance.now() - t0);
       $('odd').innerHTML = `
         <div style="text-align:center;color:white;">
-          <div style="font-size:56px;font-weight:800;">${found}</div>
-          <div style="color:var(--muted);margin-top:6px;">найдено</div>
+          <div style="font-size:56px;font-weight:800;">${score}</div>
+          <div style="color:var(--muted);margin-top:6px;">${found} найдено, ${wrong} ошибок</div>
           <div style="color:var(--muted);margin-top:20px;font-size:13px;">Ждём соперника...</div>
         </div>
       `;
@@ -4323,7 +4281,7 @@ function startTypingGame() {
       cancelAnimationFrame(rafId);
       inp.removeEventListener('input', onInput);
       inp.blur();
-      const score = correct * 300;  // 300 очков за слово
+      const score = correct;
       sendResult(score, performance.now() - t0);
       $('typ').innerHTML = `
         <div style="text-align:center;color:white;">
@@ -4354,15 +4312,15 @@ function startStroopGame() {
   const area = $('game-area');
   area.innerHTML = `
     <div class="stroop-area" id="stroop">
-      <div class="stroop-hud">🎨 <span id="stroop-correct">0</span> верно • <span id="stroop-time">20.0</span>s</div>
+      <div class="stroop-hud">🎨 <span id="stroop-correct">0</span> ✓ • <span id="stroop-wrong">0</span> ✗ • <span id="stroop-time">20.0</span>s</div>
       <div class="stroop-word" id="stroop-word">—</div>
       <div class="stroop-opts" id="stroop-opts"></div>
     </div>
   `;
   const DURATION = 20000;
   const t0 = performance.now();
-  let correct = 0;
-  let currentColor = null;  // { name, color }
+  let correct = 0, wrong = 0;
+  let currentColor = null;
   let finished = false;
   let rafId = null;
   let lock = false;
@@ -4404,8 +4362,9 @@ function startStroopGame() {
       btn.classList.add('correct');
       setTimeout(() => { if (!finished) next(); }, 160);
     } else {
+      wrong++;
+      $('stroop-wrong').textContent = wrong;
       btn.classList.add('wrong');
-      // Штраф — 400мс пауза без нового раунда
       setTimeout(() => { lock = false; btn.classList.remove('wrong'); }, 400);
     }
   }
@@ -4417,12 +4376,12 @@ function startStroopGame() {
     if (left <= 0) {
       finished = true;
       cancelAnimationFrame(rafId);
-      const score = correct * 250;
+      const score = correct - wrong;
       sendResult(score, performance.now() - t0);
       $('stroop').innerHTML = `
         <div style="text-align:center;color:white;">
-          <div style="font-size:56px;font-weight:800;">${correct}</div>
-          <div style="color:var(--muted);margin-top:6px;">правильных</div>
+          <div style="font-size:56px;font-weight:800;">${score}</div>
+          <div style="color:var(--muted);margin-top:6px;">${correct} верно, ${wrong} ошибок</div>
           <div style="color:var(--muted);margin-top:20px;font-size:13px;">Ждём соперника...</div>
         </div>
       `;
@@ -4530,7 +4489,7 @@ function startMemoryGame() {
     if (left <= 0) {
       finished = true;
       cancelAnimationFrame(rafId);
-      const score = pairs * 300;
+      const score = pairs;
       sendResult(score, performance.now() - t0);
       $('mem').innerHTML = `
         <div style="text-align:center;color:white;">
@@ -4642,7 +4601,7 @@ function startSpatialGame() {
     finished = true;
     clearTimeout(hardTimer);
     cancelAnimationFrame(rafId);
-    const score = level * 400;
+    const score = level;
     sendResult(score, performance.now() - t0);
     $('sp-status').textContent = `Лучший уровень: ${level}`;
     $('sp-grid').innerHTML = '';
@@ -4721,8 +4680,14 @@ function startAudioGame() {
       hap('tap');
     }, delay);
   }
+  function pointsForRt(rt, isFalseStart) {
+    if (isFalseStart) return -1;
+    if (rt < 300) return 2;
+    if (rt < 500) return 1;
+    return 0;
+  }
   function renderList() {
-    $('aud-list').textContent = attempts.map(a => Math.round(a) + 'мс').join(' • ');
+    $('aud-list').textContent = attempts.map(a => a.fs ? 'фальстарт' : Math.round(a.rt) + 'мс').join(' • ');
   }
   function onClick() {
     ensureCtx();
@@ -4730,18 +4695,20 @@ function startAudioGame() {
       hap('error');
       clearTimeout(timerId);
       el.classList.add('early');
-      $('aud-big').textContent = 'Рано! +500мс';
-      attempts.push(500); renderList();
+      $('aud-big').textContent = 'Рано! −1 балл';
+      attempts.push({ rt: 0, points: -1, fs: true });
+      renderList();
       setTimeout(() => { if (!finished) scheduleNext(); }, 700);
       return;
     }
     if (waiting) {
       hap('success');
       const rt = performance.now() - showTs;
-      attempts.push(rt);
+      const p = pointsForRt(rt, false);
+      attempts.push({ rt, points: p, fs: false });
       waiting = false;
       el.classList.remove('go');
-      $('aud-big').textContent = Math.round(rt) + ' мс';
+      $('aud-big').textContent = Math.round(rt) + ' мс  ' + (p > 0 ? '+' + p : '0');
       renderList();
       setTimeout(() => { if (!finished) scheduleNext(); }, 700);
     }
@@ -4749,11 +4716,10 @@ function startAudioGame() {
   function finish() {
     if (finished) return;
     finished = true;
-    let s = 0;
-    for (const rt of attempts) s += Math.max(0, 500 - Math.min(rt, 500)) * 3;
+    const total = attempts.reduce((sum, a) => sum + a.points, 0);
     const elapsed = performance.now() - t0;
-    sendResult(s, elapsed);
-    $('aud-big').textContent = 'Готово: ' + Math.round(s);
+    sendResult(total, elapsed);
+    $('aud-big').textContent = 'Итог: ' + total;
   }
   el.addEventListener('click', onClick);
   scheduleNext();
@@ -4809,7 +4775,6 @@ function startRhythmGame() {
   function onTap() {
     if (finished) return;
     const now = performance.now() - t0;
-    // Ищем ближайший не использованный бит
     let best = -1, bestDiff = Infinity;
     for (let i = 0; i < beats.length; i++) {
       if (i <= lastHitIdx) continue;
@@ -4817,24 +4782,20 @@ function startRhythmGame() {
       if (d < bestDiff) { bestDiff = d; best = i; }
       if (beats[i] > now + 300) break;
     }
-    if (best < 0 || bestDiff > 250) {
-      resEl.textContent = 'Мимо!';
+    if (best < 0 || bestDiff > 200) {
+      resEl.textContent = 'Мимо';
       resEl.style.color = 'var(--lose)';
       hap('error');
       return;
     }
     lastHitIdx = best;
     hits++;
+    score = hits;
     $('rhy-hits').textContent = hits;
-    // Чем точнее — тем больше очков
-    let pts = 0; let grade = '';
-    if (bestDiff < 60)       { pts = 200; grade = 'Идеально!'; hap('success'); }
-    else if (bestDiff < 120) { pts = 120; grade = 'Хорошо'; hap('tap'); }
-    else if (bestDiff < 200) { pts = 60;  grade = 'Поздно/Рано'; hap('tap'); }
-    else                     { pts = 20;  grade = 'Далеко'; }
-    score += pts;
-    resEl.textContent = `${grade} (+${pts})`;
-    resEl.style.color = pts >= 120 ? 'var(--win)' : 'var(--warn)';
+    let grade = bestDiff < 70 ? 'Идеально!' : 'Попал';
+    resEl.textContent = `${grade} +1`;
+    resEl.style.color = 'var(--win)';
+    hap(bestDiff < 70 ? 'success' : 'tap');
   }
 
   const loop = () => {
@@ -4864,7 +4825,7 @@ function startBalanceGame() {
   const area = $('game-area');
   area.innerHTML = `
     <div class="bal-area" id="bal">
-      <div class="bal-hud">⚖️ <span id="bal-score">0</span> очков • <span id="bal-time">20.0</span>s</div>
+      <div class="bal-hud">⚖️ <span id="bal-score">0</span> сек в центре • <span id="bal-time">20.0</span>s</div>
       <div class="bal-ring">
         <div class="bal-target" id="bal-target"></div>
         <div class="bal-ball" id="bal-ball"></div>
@@ -4915,14 +4876,19 @@ function startBalanceGame() {
   let driftX = (Math.random() - 0.5) * 0.0004;
   let driftY = (Math.random() - 0.5) * 0.0004;
   let lastShuffle = t0;
+  let lastTickAt = t0;
+  let timeInCenterMs = 0;  // суммарное время когда шарик в центре
 
   const tick = (now) => {
     if (finished) return;
     const elapsed = now - t0;
+    const dt = now - lastTickAt;
+    lastTickAt = now;
     if (elapsed > DURATION) {
       finished = true;
       cancelAnimationFrame(rafId);
-      sendResult(Math.floor(score), elapsed);
+      const sec = Math.floor(timeInCenterMs / 1000);
+      sendResult(sec, elapsed);
       return;
     }
     // Смена дрейфа каждые 2.5 сек
@@ -4948,11 +4914,11 @@ function startBalanceGame() {
     x = Math.max(0.05, Math.min(0.95, x));
     y = Math.max(0.05, Math.min(0.95, y));
     updateBallPos();
-    // Очки: чем ближе к центру — тем больше
+    // В центре (dist < 0.18) — накапливаем время в мс
     const dist = Math.hypot(x - 0.5, y - 0.5);
     if (dist < 0.18) {
-      score += (0.18 - dist) * 50;
-      $('bal-score').textContent = Math.floor(score);
+      timeInCenterMs += dt;
+      $('bal-score').textContent = Math.floor(timeInCenterMs / 1000);
     }
     $('bal-time').textContent = ((DURATION - elapsed) / 1000).toFixed(1);
     rafId = requestAnimationFrame(tick);
@@ -5037,7 +5003,7 @@ function startQuickDrawGame() {
     }
     hap('tap');
     currentIdx++;
-    score += 200;
+    score += 1;
     $('qd-step').textContent = currentIdx;
     $('qd-score').textContent = score;
     lastCorrectTs = performance.now();
@@ -5066,7 +5032,7 @@ function startQuickDrawGame() {
     // Бонус за скорость если прошёл все точки
     if (complete) {
       const timeLeft = Math.max(0, DURATION - (performance.now() - t0));
-      score += Math.floor(timeLeft / 10);
+      // Бонус времени — не добавляем, чтобы score = точно количество соединённых точек
     }
     sendResult(score, performance.now() - t0);
   }
