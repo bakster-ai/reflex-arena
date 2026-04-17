@@ -2787,66 +2787,63 @@ function startSortZonesGame() {
 }
 
 // ─── Map tap: тапни страну на карте ───
+// Flag Quiz: показываем большой флаг, 4 варианта стран — тапни правильную
 function startMapTapGame() {
   const area = $('game-area');
   area.innerHTML = `
     <div class="math-area" id="mt" style="overflow:hidden;">
-      <div class="math-hud">🗺️ <span id="mt-score">0</span> • <span id="mt-time">20.0</span>s</div>
-      <div style="position:absolute;top:48px;left:0;right:0;text-align:center;font-weight:800;font-size:16px;color:var(--accent2);" id="mt-task">—</div>
-      <div id="mt-map" style="position:absolute;top:86px;left:10px;right:10px;bottom:10px;background:#1a3a5e;border-radius:12px;overflow:hidden;cursor:crosshair;">
-        <svg viewBox="0 0 100 50" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;" preserveAspectRatio="none">
-          <!-- Упрощённые континенты -->
-          <path d="M3 8 L20 6 L28 10 L30 22 L22 32 L15 30 L8 24 Z" fill="#2a5a2a" opacity="0.7"/>
-          <path d="M18 35 L28 34 L32 60 L22 78 L18 80 L15 60 Z" fill="#2a5a2a" opacity="0.7"/>
-          <path d="M38 14 L62 12 L68 18 L66 32 L58 36 L48 36 L42 28 L38 22 Z" fill="#2a5a2a" opacity="0.7"/>
-          <path d="M48 38 L62 40 L66 62 L50 82 L48 60 Z" fill="#2a5a2a" opacity="0.7"/>
-          <path d="M60 16 L86 14 L94 28 L92 44 L84 50 L72 46 L64 38 Z" fill="#2a5a2a" opacity="0.7"/>
-          <path d="M76 72 L92 68 L96 82 L82 88 Z" fill="#2a5a2a" opacity="0.7"/>
-        </svg>
-      </div>
+      <div class="math-hud">🎌 <span id="mt-correct">0</span> ✓ • <span id="mt-wrong">0</span> ✗ • <span id="mt-time">20.0</span>s</div>
+      <div id="mt-flag" style="font-size:120px;margin-top:24px;margin-bottom:20px;text-align:center;">🏳️</div>
+      <div style="color:var(--muted);font-size:13px;margin-bottom:14px;">Какая это страна?</div>
+      <div class="math-options" id="mt-opts" style="width:90%;max-width:360px;"></div>
     </div>
   `;
   const DURATION = 20000;
   const t0 = performance.now();
-  let score = 0, finished = false, rafId = null;
-  let targetCountry = null;
-  const mapEl = $('mt-map');
+  let correct = 0, wrong = 0, finished = false, rafId = null, lock = false;
 
-  function nextTarget() {
-    targetCountry = COUNTRIES_POOL[Math.floor(Math.random() * COUNTRIES_POOL.length)];
-    $('mt-task').textContent = 'Найди: ' + targetCountry.name;
+  function next() {
+    if (finished) return;
+    const target = COUNTRIES_POOL[Math.floor(Math.random() * COUNTRIES_POOL.length)];
+    $('mt-flag').textContent = target.flag;
+    // 4 варианта: target + 3 случайных других
+    const opts = new Set([target.name]);
+    while (opts.size < 4) {
+      const c = COUNTRIES_POOL[Math.floor(Math.random() * COUNTRIES_POOL.length)];
+      opts.add(c.name);
+    }
+    const shuffled = [...opts].sort(() => Math.random() - 0.5);
+    const optsEl = $('mt-opts');
+    optsEl.innerHTML = '';
+    lock = false;
+    shuffled.forEach(name => {
+      const btn = document.createElement('button');
+      btn.className = 'math-opt';
+      btn.style.cssText = 'font-size:14px;padding:14px 10px;';
+      btn.textContent = name;
+      btn.addEventListener('click', () => {
+        if (lock || finished) return;
+        lock = true;
+        if (name === target.name) {
+          correct++;
+          $('mt-correct').textContent = correct;
+          btn.classList.add('correct');
+          hap('success');
+        } else {
+          wrong++;
+          $('mt-wrong').textContent = wrong;
+          btn.classList.add('wrong');
+          hap('error');
+          // Подсветим правильный
+          optsEl.querySelectorAll('.math-opt').forEach(b => {
+            if (b.textContent === target.name) b.classList.add('correct');
+          });
+        }
+        setTimeout(() => { if (!finished) next(); }, 400);
+      });
+      optsEl.appendChild(btn);
+    });
   }
-
-  function onMapClick(e) {
-    if (finished || !targetCountry) return;
-    const r = mapEl.getBoundingClientRect();
-    const px = (e.clientX - r.left) / r.width;
-    const py = (e.clientY - r.top) / r.height;
-    const dist = Math.hypot(px - targetCountry.x, py - targetCountry.y);
-    // Показываем маркер правильного места
-    const marker = document.createElement('div');
-    marker.style.cssText = `position:absolute;left:${targetCountry.x * 100}%;top:${targetCountry.y * 100}%;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;background:#ff4d6d;border:2px solid white;pointer-events:none;z-index:3;`;
-    mapEl.appendChild(marker);
-    const myMarker = document.createElement('div');
-    myMarker.style.cssText = `position:absolute;left:${px * 100}%;top:${py * 100}%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#26d67f;border:2px solid white;pointer-events:none;z-index:3;`;
-    mapEl.appendChild(myMarker);
-    // Очки за близость: < 0.05 = +3, < 0.10 = +2, < 0.18 = +1, дальше = 0
-    let pts = 0, grade = 'Мимо';
-    if (dist < 0.05) { pts = 3; grade = 'Идеально! +3'; hap('success'); }
-    else if (dist < 0.10) { pts = 2; grade = 'Близко +2'; hap('success'); }
-    else if (dist < 0.18) { pts = 1; grade = 'Рядом +1'; hap('tap'); }
-    else { pts = 0; hap('error'); }
-    score += pts;
-    $('mt-score').textContent = score;
-    $('mt-task').textContent = grade + ' — ' + targetCountry.name;
-    setTimeout(() => {
-      if (finished) return;
-      marker.remove(); myMarker.remove();
-      nextTarget();
-    }, 900);
-  }
-
-  mapEl.addEventListener('click', onMapClick);
 
   function loop(now) {
     if (finished) return;
@@ -2855,22 +2852,17 @@ function startMapTapGame() {
     if (left <= 0) {
       finished = true;
       cancelAnimationFrame(rafId);
+      const score = correct - wrong;
       sendResult(score, now - t0);
-      $('mt').innerHTML = `<div style="text-align:center;color:white;"><div style="font-size:56px;font-weight:800;">${score}</div><div style="color:var(--muted);margin-top:6px;">очков</div></div>`;
+      $('mt').innerHTML = `<div style="text-align:center;color:white;padding-top:40px;"><div style="font-size:56px;font-weight:800;">${score}</div><div style="color:var(--muted);margin-top:6px;">${correct} верно, ${wrong} ошибок</div></div>`;
       return;
     }
     rafId = requestAnimationFrame(loop);
   }
 
-  nextTarget();
+  next();
   rafId = requestAnimationFrame(loop);
-  return {
-    cleanup: () => {
-      finished = true;
-      cancelAnimationFrame(rafId);
-      mapEl.removeEventListener('click', onMapClick);
-    }
-  };
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
 }
 
 // ─── Timeline: расставь события в хронологическом порядке ───
@@ -4152,52 +4144,86 @@ function startAimGame() {
   const area = $('game-area');
   area.innerHTML = `
     <div class="aim-area" id="aim">
-      <div class="aim-hud">🎯 <span id="aim-hits">0</span> попаданий • <span id="aim-time">15.0</span>s</div>
+      <div class="aim-hud">🎯 <span id="aim-hits">0</span> ✓ • <span id="aim-miss">0</span> ✗ • <span id="aim-time">15.0</span>s</div>
+      <div style="position:absolute;top:48px;left:0;right:0;text-align:center;color:var(--lose);font-weight:800;font-size:14px;pointer-events:none;z-index:3;">Тапай ТОЛЬКО красные!</div>
     </div>
   `;
   const el = $('aim');
   const DURATION = 15000;
   const t0 = performance.now();
   let hits = 0;
+  let miss = 0;
   let target = null;
-  let targetHitHandler = null;
   let finished = false;
   let rafId = null;
+
+  // 50% мишеней — красные (правильные), 50% других цветов
+  const COLORS = [
+    { name: 'red',    bg: 'radial-gradient(circle, #ff4d6d 0%, #a8243f 60%, #1a0a0f 100%)', correct: true },
+    { name: 'blue',   bg: 'radial-gradient(circle, #4a7dff 0%, #1e3b8f 60%, #0a0f1f 100%)', correct: false },
+    { name: 'green',  bg: 'radial-gradient(circle, #4aff7a 0%, #1e8f3b 60%, #0a1f10 100%)', correct: false },
+    { name: 'yellow', bg: 'radial-gradient(circle, #ffd94a 0%, #8f7a1e 60%, #1f180a 100%)', correct: false },
+  ];
 
   function spawn() {
     if (finished) return;
     if (target) target.remove();
     const rect = el.getBoundingClientRect();
-    // Fallback на случай если rect ещё не рассчитан браузером
     const W = rect.width > 100 ? rect.width : (window.innerWidth || 400);
     const H = rect.height > 100 ? rect.height : Math.max(240, (window.innerHeight || 500) - 200);
-    // Если по какой-то причине размеры всё ещё крошечные — retry через rAF
     if (W < 100 || H < 100) {
       requestAnimationFrame(() => spawn());
       return;
     }
     const margin = 50;
+    const topOffset = 80;  // чтобы не наслаивалось на текст "Тапай только красные"
     const x = margin + Math.random() * Math.max(10, W - 2 * margin);
-    const y = margin + Math.random() * Math.max(10, H - 2 * margin);
+    const y = topOffset + Math.random() * Math.max(10, H - topOffset - margin);
+    // 50% шанс красной мишени, иначе случайный не-красный цвет
+    const color = Math.random() < 0.5 ? COLORS[0] : COLORS[1 + Math.floor(Math.random() * 3)];
     const t = document.createElement('div');
     t.className = 'aim-target';
     t.style.left = x + 'px';
     t.style.top = y + 'px';
+    t.style.background = color.bg;
+    t.style.boxShadow = `0 0 20px ${color.name === 'red' ? 'rgba(255,77,109,0.6)' :
+                                   color.name === 'blue' ? 'rgba(74,125,255,0.6)' :
+                                   color.name === 'green' ? 'rgba(74,255,122,0.6)' :
+                                   'rgba(255,217,74,0.6)'}`;
     t.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
-      hap('tap');
-      hits++;
-      $('aim-hits').textContent = hits;
-      t.classList.add('hit');
+      if (color.correct) {
+        hap('success');
+        hits++;
+        $('aim-hits').textContent = hits;
+        t.classList.add('hit');
+      } else {
+        hap('error');
+        miss++;
+        $('aim-miss').textContent = miss;
+        // Ошибка — оставляем вспышку красного шторма
+        t.style.filter = 'hue-rotate(0deg) brightness(0.5) saturate(2)';
+        t.style.boxShadow = '0 0 30px rgba(255, 0, 0, 0.9)';
+      }
       setTimeout(() => t.remove(), 200);
       target = null;
       spawn();
     });
     el.appendChild(t);
     target = t;
+
+    // Не-красные автоматически исчезают через 1.5 сек (чтобы не висели как приманка-ловушка навсегда)
+    if (!color.correct) {
+      setTimeout(() => {
+        if (target === t) {
+          t.remove();
+          target = null;
+          spawn();
+        }
+      }, 1500);
+    }
   }
 
-  // Клик мимо тоже что-то значит — но не штрафуем в MVP, просто игнор
   const loop = () => {
     if (finished) return;
     const elapsed = performance.now() - t0;
@@ -4207,13 +4233,13 @@ function startAimGame() {
       finished = true;
       cancelAnimationFrame(rafId);
       if (target) target.remove();
-      const score = hits;
-      const elapsedMs = performance.now() - t0;
-      sendResult(score, elapsedMs);
+      const score = hits - miss;
+      sendResult(score, elapsed);
       el.innerHTML = `
-        <div style="color: white; text-align: center;">
-          <div style="font-size: 48px; font-weight: 800;">${hits} попаданий</div>
-          <div style="color: var(--muted); margin-top: 10px;">Ждём соперника...</div>
+        <div style="color: white; text-align: center; padding-top: 60px;">
+          <div style="font-size: 56px; font-weight: 800;">${score}</div>
+          <div style="color: var(--muted); margin-top: 6px;">${hits} попаданий, ${miss} промахов</div>
+          <div style="color: var(--muted); margin-top: 20px; font-size: 13px;">Ждём соперника...</div>
         </div>
       `;
       return;
@@ -5195,7 +5221,8 @@ function startGolfGame() {
     }
 
     // Движение мяча
-    if (Math.hypot(vx, vy) > 0.3) {
+    const speed = Math.hypot(vx, vy);
+    if (speed > 0.3) {
       bx += vx; by += vy;
       // Трение
       vx *= 0.97; vy *= 0.97;
@@ -5206,19 +5233,26 @@ function startGolfGame() {
       if (by > a.h - BALL_R - 20) { by = a.h - BALL_R - 20; vy = -vy * 0.7; }
       ball.style.left = bx + 'px'; ball.style.top = by + 'px';
 
-      // Проверка попадания в лунку
-      if (Math.hypot(bx - hx, by - hy) < HOLE_R) {
+      // Магнит к лунке: когда мяч медленный И рядом с лункой — притягиваем
+      const distToHole = Math.hypot(bx - hx, by - hy);
+      if (speed < 2.5 && distToHole < HOLE_R + 8) {
+        // Притягиваем к центру лунки
+        const pull = 0.35;
+        vx += ((hx - bx) / distToHole) * pull;
+        vy += ((hy - by) / distToHole) * pull;
+      }
+    } else {
+      // Мяч почти остановился
+      vx = 0; vy = 0;
+      // Засчитываем попадание ТОЛЬКО если мяч остановился в зоне лунки
+      const distToHole = Math.hypot(bx - hx, by - hy);
+      if (distToHole < HOLE_R) {
         score++; $('gf-score').textContent = score;
         hap('success');
         playVictoryVfx('stars');
-        // Сбрасываем мяч и новая лунка
-        vx = 0; vy = 0;
         placeBallInitial();
         setTimeout(() => { if (!finished) placeNewHole(); }, 100);
       }
-    } else if (Math.abs(vx) > 0.01 || Math.abs(vy) > 0.01) {
-      // остановка
-      vx = 0; vy = 0;
     }
 
     rafId = requestAnimationFrame(loop);
