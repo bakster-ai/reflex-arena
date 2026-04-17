@@ -278,6 +278,20 @@ GAMES = {
         "min_elapsed_ms": 5000,
         "max_elapsed_ms": 32000,
     },
+    "reaction_grid": {
+        "name": "Сетка",
+        "desc": "Сетка 3×3, загорается одна клетка — тапни максимально быстро. 20 сек.",
+        "max_score": 50,
+        "min_elapsed_ms": 19500,
+        "max_elapsed_ms": 21000,
+    },
+    "count_dots": {
+        "name": "Счёт точек",
+        "desc": "Появляется россыпь точек, сосчитай их за 2 сек, тапни правильное число. 20 сек.",
+        "max_score": 30,
+        "min_elapsed_ms": 19500,
+        "max_elapsed_ms": 21000,
+    },
 }
 GAME_POOL = list(GAMES.keys())
 K_FACTOR = 32
@@ -286,9 +300,9 @@ BASE_ELO = 1000.0
 # Категории игр → для категорийного ELO
 GAME_CATEGORIES = {
     # 🔴 Реакция
-    "react": "reaction", "aim": "reaction", "odd": "reaction",
+    "react": "reaction", "aim": "reaction", "odd": "reaction", "reaction_grid": "reaction",
     # 🟡 Логика
-    "math": "logic", "sequence": "logic", "stroop": "logic", "number_chain": "logic",
+    "math": "logic", "sequence": "logic", "stroop": "logic", "number_chain": "logic", "count_dots": "logic",
     # 🟢 Память
     "memory": "memory", "spatial": "memory", "visual_memory": "memory", "word_memory": "memory",
     # 🔵 Координация
@@ -315,6 +329,7 @@ AI_PROFILES = {
         "memory": (3, 2), "spatial": (2, 1), "visual_memory": (3, 2), "word_memory": (4, 2),
         "typing": (4, 2), "rhythm": (10, 3), "balance": (2, 1), "quick_draw": (5, 2),
         "flags_rain": (4, 2), "sort_zones": (8, 3), "map_tap": (4, 2), "timeline": (2, 1),
+        "reaction_grid": (8, 3), "count_dots": (5, 2),
         "elo": 800, "nickname": "🤖 AI Новичок",
         "elapsed_factor": 0.9,
     },
@@ -324,6 +339,7 @@ AI_PROFILES = {
         "memory": (7, 2), "spatial": (5, 1), "visual_memory": (6, 2), "word_memory": (10, 3),
         "typing": (9, 2), "rhythm": (22, 4), "balance": (5, 2), "quick_draw": (12, 3),
         "flags_rain": (10, 3), "sort_zones": (18, 4), "map_tap": (9, 3), "timeline": (6, 2),
+        "reaction_grid": (22, 4), "count_dots": (12, 3),
         "elo": 1000, "nickname": "🤖 AI Средний",
         "elapsed_factor": 1.0,
     },
@@ -333,6 +349,7 @@ AI_PROFILES = {
         "memory": (12, 2), "spatial": (10, 2), "visual_memory": (9, 1), "word_memory": (14, 2),
         "typing": (15, 3), "rhythm": (35, 4), "balance": (10, 2), "quick_draw": (18, 3),
         "flags_rain": (18, 3), "sort_zones": (28, 4), "map_tap": (14, 3), "timeline": (10, 2),
+        "reaction_grid": (35, 4), "count_dots": (20, 3),
         "elo": 1300, "nickname": "🤖 AI Мастер",
         "elapsed_factor": 1.0,
     },
@@ -444,7 +461,7 @@ def _ai_elapsed_for(game_id: str, difficulty: str) -> int:
     max_e = cfg.get("max_elapsed_ms", 60000)
     factor = prof.get("elapsed_factor", 1.0)
     # Игры с фиксированной длительностью: играем всю её
-    if game_id in ("aim", "math", "odd", "typing", "stroop", "memory", "rhythm", "balance", "flags_rain", "sort_zones", "map_tap", "number_chain"):
+    if game_id in ("aim", "math", "odd", "typing", "stroop", "memory", "rhythm", "balance", "flags_rain", "sort_zones", "map_tap", "number_chain", "reaction_grid", "count_dots"):
         return int(min(max_e, max(min_e, max_e * 0.97 * factor)))
     # react/sequence/spatial/audio/quick_draw: может быть короче
     return int(min_e + random.random() * 500)

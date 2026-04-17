@@ -1641,29 +1641,45 @@
   </div>
 
   <!-- ── Onboarding modal ── -->
-  <div id="onboard-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2500;align-items:center;justify-content:center;padding:20px;">
-    <div style="background:var(--panel);border:1.5px solid var(--accent);border-radius:16px;padding:24px;max-width:400px;width:100%;max-height:90vh;overflow-y:auto;">
-      <div style="text-align:center;margin-bottom:16px;">
-        <div style="font-size:52px;margin-bottom:6px;">⚡</div>
-        <h2 style="margin:0;">Добро пожаловать в Reflex Arena</h2>
+  <div id="onboard-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:2500;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--panel);border:1.5px solid var(--accent);border-radius:16px;padding:22px;max-width:400px;width:100%;max-height:90vh;overflow-y:auto;">
+      <div id="ob-step-1">
+        <div style="text-align:center;margin-bottom:14px;">
+          <div style="font-size:52px;margin-bottom:4px;">⚡</div>
+          <h2 style="margin:0;">Reflex Arena</h2>
+          <div style="color:var(--muted);font-size:13px;margin-top:4px;">1v1 на реакцию. Шаг 1 из 3</div>
+        </div>
+        <div style="color:var(--text);font-size:14px;line-height:1.5;margin-bottom:16px;">
+          Матч — <b>5 мини-игр на скорость и внимание</b>. 5 категорий: реакция, логика, память, координация, эрудиция. <b>Кто выиграл 3 раунда — победил</b>.
+        </div>
+        <button onclick="obStep(2)" style="width:100%;padding:14px;background:linear-gradient(90deg,var(--accent),var(--accent2));color:#1a1205;border:none;border-radius:10px;font-weight:800;font-size:15px;cursor:pointer;">Дальше →</button>
       </div>
-      <div style="color:var(--muted);font-size:14px;line-height:1.5;margin-bottom:16px;">
-        <b style="color:var(--text);">Как играть:</b><br>
-        • Матч 1v1 до 3 побед (Best of 5)<br>
-        • 13 случайных мини-игр на реакцию<br>
-        • Победитель забирает банк + ELO<br>
+      <div id="ob-step-2" style="display:none;">
+        <h2 style="margin:0 0 10px;">Начни с бота 🤖</h2>
+        <div style="color:var(--muted);font-size:13px;margin-bottom:4px;">Шаг 2 из 3</div>
+        <div style="color:var(--text);font-size:14px;line-height:1.5;margin-bottom:14px;">
+          Прежде чем искать реальных соперников — <b>попробуй матч с ботом</b>. Без ставок, без рейтинга, просто почувствуй как всё устроено.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <button onclick="obPlayBot('easy')" style="padding:14px 8px;background:var(--win);color:#0e0f13;border:none;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">🤖 Новичок</button>
+          <button onclick="obPlayBot('medium')" style="padding:14px 8px;background:var(--warn);color:#0e0f13;border:none;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">🤖 Средний</button>
+        </div>
+        <button onclick="obStep(3)" style="width:100%;padding:10px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:10px;cursor:pointer;font-size:13px;">Пропустить →</button>
       </div>
-      <div style="color:var(--muted);font-size:14px;line-height:1.5;margin-bottom:16px;">
-        <b style="color:var(--text);">Режимы:</b><br>
-        • <span style="color:var(--accent);">Найти матч</span> — играй рандомом<br>
-        • <span style="color:var(--win);">С ботом</span> — потренируйся<br>
-        • <span style="color:#7dd3fc;">Комната по ссылке</span> — с другом<br>
-        • <span style="color:#ffc93c;">Испытание дня</span> — solo топ
+      <div id="ob-step-3" style="display:none;">
+        <h2 style="margin:0 0 10px;">Что дальше 🎯</h2>
+        <div style="color:var(--muted);font-size:13px;margin-bottom:10px;">Шаг 3 из 3</div>
+        <div style="color:var(--text);font-size:14px;line-height:1.5;margin-bottom:12px;">
+          • <b style="color:var(--accent);">Заходи каждый день</b> — получай бонус за стрик (до +200 💰)<br>
+          • <b style="color:#7dd3fc;">Приглашай друзей</b> — создай комнату, кинь ссылку<br>
+          • <b style="color:var(--win);">Копи монеты</b> — открывай кейсы, коллекционируй предметы<br>
+          • <b style="color:#ffc93c;">Daily Challenge</b> — твой результат в топе дня
+        </div>
+        <div style="color:var(--muted);font-size:12px;margin-bottom:14px;padding:10px;background:var(--panel2);border-radius:8px;">
+          💡 Добавь страницу на главный экран — запускается как приложение
+        </div>
+        <button onclick="closeOnboarding()" style="width:100%;padding:14px;background:linear-gradient(90deg,var(--accent),var(--accent2));color:#1a1205;border:none;border-radius:10px;font-weight:800;font-size:15px;cursor:pointer;">Погнали играть →</button>
       </div>
-      <div style="color:var(--muted);font-size:13px;margin-bottom:18px;padding:10px;background:var(--panel2);border-radius:8px;">
-        💡 Добавь страницу на главный экран — запускается как приложение
-      </div>
-      <button onclick="closeOnboarding()" style="width:100%;padding:14px;background:linear-gradient(90deg,var(--accent),var(--accent2));color:#1a1205;border:none;border-radius:10px;font-weight:800;font-size:15px;cursor:pointer;">Понял, поехали →</button>
     </div>
   </div>
 
@@ -2110,8 +2126,18 @@ function renderTop() {
 
 async function showOnboardingIfNeeded() {
   if (!ME || ME.onboarded) return;
-  // Показываем модалку
+  obStep(1);
   $('onboard-modal').style.display = 'flex';
+}
+function obStep(n) {
+  for (let i = 1; i <= 3; i++) {
+    const el = $('ob-step-' + i);
+    if (el) el.style.display = (i === n) ? 'block' : 'none';
+  }
+}
+function obPlayBot(difficulty) {
+  closeOnboarding();
+  playVsAi(difficulty);
 }
 async function closeOnboarding() {
   $('onboard-modal').style.display = 'none';
@@ -2119,6 +2145,7 @@ async function closeOnboarding() {
     await API.post('/api/onboarded', {});
     if (ME) ME.onboarded = true;
   } catch (e) {}
+  logEvent('onboarding_complete', {});
   hap('success');
 }
 
@@ -2280,7 +2307,7 @@ function playDailyChallenge(game) {
   cleanupGame();
   $('game-area').innerHTML = `
     <div class="game-intro">
-      <div class="game-name">${escapeHtml({aim:'Снайпер',math:'Устный счёт',odd:'Найди отличие',typing:'Скорость печати',stroop:'Строп-тест',memory:'Память',spatial:'Пространственная память',rhythm:'Ритм',balance:'Гольф',quick_draw:'Быстрый штрих',number_chain:'Числовая цепочка',visual_memory:'Визуальная память',word_memory:'Слова',flags_rain:'Поймай флаг',sort_zones:'Сортировка',map_tap:'Карта мира',timeline:'Хронология'}[game] || game)}</div>
+      <div class="game-name">${escapeHtml({aim:'Снайпер',math:'Устный счёт',odd:'Найди отличие',typing:'Скорость печати',stroop:'Строп-тест',memory:'Память',spatial:'Пространственная память',rhythm:'Ритм',balance:'Гольф',quick_draw:'Быстрый штрих',number_chain:'Числовая цепочка',visual_memory:'Визуальная память',word_memory:'Слова',flags_rain:'Поймай флаг',sort_zones:'Сортировка',map_tap:'Карта мира',timeline:'Хронология',reaction_grid:'Сетка',count_dots:'Счёт точек'}[game] || game)}</div>
       <div class="game-desc">Набери максимум очков. Твой лучший результат дня попадёт в топ.</div>
       <div class="countdown" id="cd">3</div>
     </div>
@@ -2960,6 +2987,166 @@ function startTimelineGame() {
   }
 
   nextSet();
+  rafId = requestAnimationFrame(loop);
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
+}
+
+// ─── Reaction Grid (3×3 сетка, загорается одна клетка — тапни быстрее) ───
+function startReactionGridGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="math-area" id="rg" style="overflow:hidden;">
+      <div class="math-hud">⚡ <span id="rg-hits">0</span> ✓ • <span id="rg-miss">0</span> ✗ • <span id="rg-time">20.0</span>s</div>
+      <div id="rg-grid" style="display:grid;grid-template-columns:repeat(3,80px);gap:10px;margin-top:10px;"></div>
+    </div>
+  `;
+  const DURATION = 20000;
+  const t0 = performance.now();
+  let hits = 0, miss = 0, finished = false, rafId = null;
+  let activeCell = -1;
+  let nextAt = 0;
+  const cells = [];
+  const grid = $('rg-grid');
+  for (let i = 0; i < 9; i++) {
+    const c = document.createElement('button');
+    c.style.cssText = 'width:80px;height:80px;background:var(--panel2);border:2px solid var(--border);border-radius:14px;cursor:pointer;transition:background 0.08s,border-color 0.08s;';
+    c.addEventListener('click', () => {
+      if (finished) return;
+      if (i === activeCell) {
+        hits++; $('rg-hits').textContent = hits;
+        hap('success');
+        c.style.background = '#26d67f'; c.style.borderColor = '#26d67f';
+        setTimeout(() => { c.style.background = 'var(--panel2)'; c.style.borderColor = 'var(--border)'; }, 100);
+        activeCell = -1;
+        nextAt = performance.now() + 200;  // небольшая пауза до новой цели
+      } else {
+        miss++; $('rg-miss').textContent = miss;
+        hap('error');
+        c.style.background = '#ff4d6d';
+        setTimeout(() => { c.style.background = 'var(--panel2)'; }, 200);
+      }
+    });
+    grid.appendChild(c);
+    cells.push(c);
+  }
+
+  function pickNew() {
+    // Сбросить старую
+    if (activeCell >= 0) cells[activeCell].style.background = 'var(--panel2)';
+    activeCell = Math.floor(Math.random() * 9);
+    cells[activeCell].style.background = 'var(--accent)';
+    cells[activeCell].style.borderColor = 'var(--accent2)';
+  }
+
+  function loop(now) {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (now - t0));
+    $('rg-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      const score = hits - miss;
+      sendResult(score, now - t0);
+      $('rg').innerHTML = `<div style="text-align:center;color:white;padding-top:40px;"><div style="font-size:56px;font-weight:800;">${score}</div><div style="color:var(--muted);margin-top:6px;">${hits} попаданий, ${miss} промахов</div></div>`;
+      return;
+    }
+    // Пропущенная цель (если не успел за 1.5 сек — штраф и новая)
+    if (activeCell >= 0 && now > nextAt + 1500) {
+      miss++; $('rg-miss').textContent = miss;
+      cells[activeCell].style.background = 'var(--panel2)';
+      cells[activeCell].style.borderColor = 'var(--border)';
+      activeCell = -1;
+      nextAt = now + 200;
+    }
+    if (activeCell < 0 && now > nextAt) {
+      pickNew();
+      nextAt = now;  // готов к таймауту
+    }
+    rafId = requestAnimationFrame(loop);
+  }
+  nextAt = performance.now() + 500;
+  rafId = requestAnimationFrame(loop);
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
+}
+
+// ─── Count Dots (россыпь точек, сосчитай за 2 сек, ответь числом) ───
+function startCountDotsGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="math-area" id="cd" style="overflow:hidden;">
+      <div class="math-hud">🔢 <span id="cd-correct">0</span> ✓ • <span id="cd-wrong">0</span> ✗ • <span id="cd-time">20.0</span>s</div>
+      <div id="cd-field" style="position:relative;width:260px;height:180px;background:var(--panel2);border:2px solid var(--border);border-radius:12px;margin:20px 0;"></div>
+      <div id="cd-opts" class="math-options" style="width:90%;max-width:360px;"></div>
+    </div>
+  `;
+  const DURATION = 20000;
+  const t0 = performance.now();
+  let correct = 0, wrong = 0, finished = false, rafId = null, lock = false;
+  const field = $('cd-field');
+
+  function next() {
+    if (finished) return;
+    lock = true;
+    // Случайное число точек 5..20
+    const count = 5 + Math.floor(Math.random() * 16);
+    field.innerHTML = '';
+    for (let i = 0; i < count; i++) {
+      const d = document.createElement('div');
+      d.style.cssText = `position:absolute;width:12px;height:12px;border-radius:50%;background:var(--accent);left:${8 + Math.random() * 230}px;top:${8 + Math.random() * 150}px;`;
+      field.appendChild(d);
+    }
+    // Через 1.5 сек прячем и даём варианты
+    setTimeout(() => {
+      if (finished) return;
+      field.innerHTML = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:48px;color:var(--muted);">?</div>`;
+      const opts = new Set([count]);
+      while (opts.size < 4) {
+        const d = count + (Math.floor(Math.random() * 7) - 3);
+        if (d > 0 && d !== count) opts.add(d);
+      }
+      const shuffled = [...opts].sort(() => Math.random() - 0.5);
+      const optsEl = $('cd-opts');
+      optsEl.innerHTML = '';
+      shuffled.forEach(v => {
+        const btn = document.createElement('button');
+        btn.className = 'math-opt';
+        btn.style.cssText = 'font-size:22px;font-weight:800;padding:14px;';
+        btn.textContent = v;
+        btn.addEventListener('click', () => {
+          if (lock !== true) return;
+          lock = false;
+          if (v === count) {
+            correct++; $('cd-correct').textContent = correct;
+            btn.classList.add('correct'); hap('success');
+          } else {
+            wrong++; $('cd-wrong').textContent = wrong;
+            btn.classList.add('wrong'); hap('error');
+            optsEl.querySelectorAll('.math-opt').forEach(b => {
+              if (parseInt(b.textContent) === count) b.classList.add('correct');
+            });
+          }
+          setTimeout(() => { if (!finished) next(); }, 400);
+        });
+        optsEl.appendChild(btn);
+      });
+    }, 1500);
+  }
+
+  function loop(now) {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (now - t0));
+    $('cd-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      const score = correct - wrong;
+      sendResult(score, now - t0);
+      $('cd').innerHTML = `<div style="text-align:center;color:white;padding-top:40px;"><div style="font-size:56px;font-weight:800;">${score}</div><div style="color:var(--muted);margin-top:6px;">${correct} верно, ${wrong} ошибок</div></div>`;
+      return;
+    }
+    rafId = requestAnimationFrame(loop);
+  }
+  next();
   rafId = requestAnimationFrame(loop);
   return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
 }
@@ -4141,6 +4328,8 @@ function startMiniGame(gameId) {
   else if (gameId === 'sort_zones') currentGame = startSortZonesGame();
   else if (gameId === 'map_tap') currentGame = startMapTapGame();
   else if (gameId === 'timeline') currentGame = startTimelineGame();
+  else if (gameId === 'reaction_grid') currentGame = startReactionGridGame();
+  else if (gameId === 'count_dots') currentGame = startCountDotsGame();
   else {
     // Неизвестная игра — возможно, старый кэш браузера. Показываем подсказку.
     console.error('Unknown mini-game:', gameId);

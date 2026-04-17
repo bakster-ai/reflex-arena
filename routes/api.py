@@ -141,6 +141,7 @@ DAILY_CHALLENGE_POOL = [
     "memory", "spatial", "visual_memory", "word_memory",
     "typing", "rhythm", "balance", "quick_draw",
     "flags_rain", "sort_zones", "map_tap", "timeline",
+    "reaction_grid", "count_dots",
 ]
 
 # Anti-cheat границы (совпадают с GAMES в reflex_ws.py)
@@ -162,6 +163,8 @@ _DC_LIMITS = {
     "sort_zones": {"min_ms": 19500, "max_ms": 21000, "max_score": 40},
     "map_tap": {"min_ms": 19500, "max_ms": 21000, "max_score": 20},
     "timeline": {"min_ms": 5000, "max_ms": 32000, "max_score": 15},
+    "reaction_grid": {"min_ms": 19500, "max_ms": 21000, "max_score": 50},
+    "count_dots": {"min_ms": 19500, "max_ms": 21000, "max_score": 30},
 }
 
 
@@ -211,6 +214,7 @@ def daily_challenge_info(authorization: Optional[str] = Header(None), db: Sessio
             "number_chain": "Числовая цепочка",
             "flags_rain": "Поймай флаг", "sort_zones": "Сортировка",
             "map_tap": "Карта мира", "timeline": "Хронология",
+            "reaction_grid": "Сетка", "count_dots": "Счёт точек",
         }.get(game, game),
         "my_best": my_best,
         "my_attempts": my_attempts,
