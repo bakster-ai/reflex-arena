@@ -21,6 +21,7 @@ import random as _rnd
 from models.models import (
     Player, ReflexMatch, ReflexAchievement, ReflexDailyTask, ReflexDailyChallenge,
     ReflexFriend, ReflexSeason, ReflexPassProgress, ReflexSeasonReward,
+    ReflexLoginStreak, ReflexEvent, ReflexPushSubscription,
 )
 from datetime import timedelta
 
@@ -1651,5 +1652,232 @@ def mark_onboarded(authorization: Optional[str] = Header(None), db: Session = De
     me = db.query(Player).filter(Player.id == payload.get("player_id")).with_for_update().first()
     if not me: return {"ok": False}
     me.reflex_onboarded = True
+    db.commit()
+    return {"ok": True}
+
+
+# ═══════════════════════════════════════════════════════
+#   Daily Login Streak
+# ═══════════════════════════════════════════════════════
+
+# Награды по дням streak (0-indexed: день 1 = STREAK_REWARDS[0])
+STREAK_REWARDS = [10, 20, 30, 50, 100, 150, 200]  # дальше по 200
+
+
+def _streak_reward_for(day: int) -> int:
+    if day <= 0:
+        return 0
+    if day <= len(STREAK_REWARDS):
+        return STREAK_REWARDS[day - 1]
+    return 200
+
+
+def _tick_streak(db: Session, player_id: int) -> ReflexLoginStreak:
+    """Обновляет streak при заходе. Если вчера был login — +1. Если 2+ пропущено — сброс в 1."""
+    today = _today_str()
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    yesterday = (_dt.now(_tz.utc) - _td(days=1)).strftime("%Y-%m-%d")
+
+    row = db.query(ReflexLoginStreak).filter(
+        ReflexLoginStreak.player_id == player_id
+    ).with_for_update().first()
+
+    if not row:
+        row = ReflexLoginStreak(
+            player_id=player_id,
+            current_streak=1,
+            max_streak=1,
+            last_login_date=today,
+            total_days_logged=1,
+        )
+        db.add(row)
+        db.commit()
+        return row
+
+    if row.last_login_date == today:
+        return row  # уже считали сегодня
+
+    if row.last_login_date == yesterday:
+        row.current_streak = (row.current_streak or 0) + 1
+    else:
+        row.current_streak = 1
+    row.max_streak = max(row.max_streak or 0, row.current_streak)
+    row.last_login_date = today
+    row.total_days_logged = (row.total_days_logged or 0) + 1
+    db.commit()
+    return row
+
+
+@router.get("/streak")
+def streak_info(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"authenticated": False}
+    payload = verify_token(authorization[7:])
+    if not payload:
+        return {"authenticated": False}
+    pid = payload.get("player_id")
+    today = _today_str()
+    row = _tick_streak(db, pid)
+    already_claimed = row.last_claimed_date == today
+    current = row.current_streak or 0
+    return {
+        "authenticated": True,
+        "current_streak": current,
+        "max_streak": row.max_streak or 0,
+        "total_days": row.total_days_logged or 0,
+        "already_claimed_today": already_claimed,
+        "today_reward": _streak_reward_for(current),
+        "next_reward_tomorrow": _streak_reward_for(current + 1),
+    }
+
+
+@router.post("/streak/claim")
+def streak_claim(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"ok": False}
+    payload = verify_token(authorization[7:])
+    if not payload:
+        return {"ok": False}
+    pid = payload.get("player_id")
+    today = _today_str()
+    row = _tick_streak(db, pid)
+    if row.last_claimed_date == today:
+        return {"ok": False, "msg": "Уже получено сегодня"}
+    reward = _streak_reward_for(row.current_streak or 1)
+    p = db.query(Player).filter(Player.id == pid).with_for_update().first()
+    if p:
+        p.coins = (p.coins or 0) + reward
+    row.last_claimed_date = today
+    db.commit()
+    return {"ok": True, "reward": reward, "new_coins": p.coins if p else 0, "streak": row.current_streak}
+
+
+# ═══════════════════════════════════════════════════════
+#   Event logging (простая аналитика)
+# ═══════════════════════════════════════════════════════
+
+@router.post("/event")
+def log_event(data: dict, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    """Клиент шлёт события: { type: "match_start", payload: {...} }"""
+    pid = None
+    if authorization and authorization.startswith("Bearer "):
+        payload = verify_token(authorization[7:])
+        if payload:
+            pid = payload.get("player_id")
+    ev_type = (data or {}).get("type", "")[:64]
+    if not ev_type:
+        return {"ok": False}
+    try:
+        db.add(ReflexEvent(
+            player_id=pid,
+            event_type=ev_type,
+            payload=(data or {}).get("payload") or {},
+        ))
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"ok": True}
+
+
+@router.get("/stats/basic")
+def stats_basic(db: Session = Depends(get_db)):
+    """Простая агрегация за сегодня/неделю (без auth — для внутреннего просмотра)."""
+    from sqlalchemy import func as sqlfunc
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    now = _dt.now(_tz.utc)
+    day_ago = now - _td(days=1)
+    week_ago = now - _td(days=7)
+
+    total_players = db.query(sqlfunc.count(Player.id)).scalar() or 0
+    guests = db.query(sqlfunc.count(Player.id)).filter(Player.is_guest == True).scalar() or 0
+    registered = total_players - guests
+
+    matches_total = db.query(sqlfunc.count(ReflexMatch.id)).filter(
+        ReflexMatch.status == "finished"
+    ).scalar() or 0
+
+    matches_24h = db.query(sqlfunc.count(ReflexMatch.id)).filter(
+        ReflexMatch.status == "finished",
+        ReflexMatch.finished_at >= day_ago,
+    ).scalar() or 0
+
+    matches_7d = db.query(sqlfunc.count(ReflexMatch.id)).filter(
+        ReflexMatch.status == "finished",
+        ReflexMatch.finished_at >= week_ago,
+    ).scalar() or 0
+
+    events_24h = db.query(sqlfunc.count(ReflexEvent.id)).filter(
+        ReflexEvent.created_at >= day_ago
+    ).scalar() or 0
+
+    # DAU за 24 часа = уникальные player_id в ReflexEvent
+    dau = db.query(sqlfunc.count(sqlfunc.distinct(ReflexEvent.player_id))).filter(
+        ReflexEvent.created_at >= day_ago,
+        ReflexEvent.player_id != None,
+    ).scalar() or 0
+
+    return {
+        "players": {"total": total_players, "guests": guests, "registered": registered},
+        "matches": {"total": matches_total, "last_24h": matches_24h, "last_7d": matches_7d},
+        "events": {"last_24h": events_24h},
+        "dau_24h": dau,
+    }
+
+
+# ═══════════════════════════════════════════════════════
+#   Push subscriptions
+# ═══════════════════════════════════════════════════════
+
+import os as _os
+
+# VAPID public key (для subscribe). Секретный ключ — в env.
+VAPID_PUBLIC_KEY = _os.environ.get("VAPID_PUBLIC_KEY", "")
+
+
+@router.get("/push/vapid_key")
+def push_vapid_key():
+    return {"key": VAPID_PUBLIC_KEY}
+
+
+@router.post("/push/subscribe")
+def push_subscribe(data: dict, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"ok": False}
+    payload = verify_token(authorization[7:])
+    if not payload:
+        return {"ok": False}
+    pid = payload.get("player_id")
+    endpoint = (data or {}).get("endpoint", "")
+    keys = (data or {}).get("keys", {})
+    if not endpoint or not keys.get("auth") or not keys.get("p256dh"):
+        return {"ok": False, "msg": "Некорректная подписка"}
+    # Upsert по endpoint
+    existing = db.query(ReflexPushSubscription).filter(
+        ReflexPushSubscription.endpoint == endpoint
+    ).first()
+    if existing:
+        existing.player_id = pid
+        existing.keys_json = keys
+    else:
+        db.add(ReflexPushSubscription(
+            player_id=pid, endpoint=endpoint, keys_json=keys,
+        ))
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/push/unsubscribe")
+def push_unsubscribe(data: dict, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"ok": False}
+    payload = verify_token(authorization[7:])
+    if not payload:
+        return {"ok": False}
+    endpoint = (data or {}).get("endpoint", "")
+    if not endpoint:
+        return {"ok": False}
+    db.query(ReflexPushSubscription).filter(
+        ReflexPushSubscription.endpoint == endpoint
+    ).delete(synchronize_session=False)
     db.commit()
     return {"ok": True}

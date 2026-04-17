@@ -53,13 +53,48 @@ def run_migrations():
             "CREATE INDEX IF NOT EXISTS idx_reflex_seasons_status ON reflex_seasons(status)",
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_reflex_pass ON reflex_pass_progress(player_id, season_id)",
             "CREATE INDEX IF NOT EXISTS idx_reflex_season_rewards_player ON reflex_season_rewards(player_id)",
+            # ── Daily streak ──
+            """CREATE TABLE IF NOT EXISTS reflex_login_streaks (
+                id SERIAL PRIMARY KEY,
+                player_id INTEGER NOT NULL REFERENCES players(id),
+                current_streak INTEGER DEFAULT 0,
+                max_streak INTEGER DEFAULT 0,
+                last_login_date VARCHAR,
+                last_claimed_date VARCHAR,
+                total_days_logged INTEGER DEFAULT 0
+            )""",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_reflex_streak_player ON reflex_login_streaks(player_id)",
+            # ── Events analytics ──
+            """CREATE TABLE IF NOT EXISTS reflex_events (
+                id SERIAL PRIMARY KEY,
+                player_id INTEGER REFERENCES players(id),
+                event_type VARCHAR NOT NULL,
+                payload JSON,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_reflex_events_type ON reflex_events(event_type)",
+            "CREATE INDEX IF NOT EXISTS idx_reflex_events_created ON reflex_events(created_at DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_reflex_events_player ON reflex_events(player_id)",
+            # ── Push subscriptions ──
+            """CREATE TABLE IF NOT EXISTS reflex_push_subscriptions (
+                id SERIAL PRIMARY KEY,
+                player_id INTEGER NOT NULL REFERENCES players(id),
+                endpoint VARCHAR NOT NULL UNIQUE,
+                keys_json JSON NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_reflex_push_player ON reflex_push_subscriptions(player_id)",
         ]
+        # Каждая миграция в своей транзакции — чтобы одна битая не аборнула остальные
         for sql in migrations:
             try:
                 conn.execute(text(sql))
-            except Exception:
-                pass
-        conn.commit()
+                conn.commit()
+            except Exception as e:
+                try: conn.rollback()
+                except Exception: pass
+                try: print(f"[migration] skip: {str(e)[:200]}")
+                except Exception: pass
 
 
 run_migrations()

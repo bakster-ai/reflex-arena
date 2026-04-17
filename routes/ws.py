@@ -341,17 +341,25 @@ AI_PROFILES = {
 
 # ─── Queue entry ───
 class _QueueEntry:
-    __slots__ = ("ws", "player_id", "stake", "mode", "joined", "event", "room_holder")
+    __slots__ = ("ws", "player_id", "stake", "mode", "elo", "joined", "event", "room_holder")
 
-    def __init__(self, ws, player_id, stake, mode="normal"):
+    def __init__(self, ws, player_id, stake, mode="normal", elo=1000.0):
         self.ws = ws
         self.player_id = player_id
         self.stake = stake
         self.mode = mode
+        self.elo = elo
         self.joined = time.time()
         self.event = asyncio.Event()
-        # Когда нас матчат, сюда записывается {"room": ..., "role": ...}
         self.room_holder: dict = {}
+
+
+def _elo_tolerance_for_wait(wait_sec: float) -> float:
+    """Насколько широко ищем оппонента в зависимости от времени ожидания."""
+    if wait_sec < 15: return 150.0
+    if wait_sec < 30: return 300.0
+    if wait_sec < 60: return 600.0
+    return 9999.0  # через 60 сек — любой
 
 
 _queue: list[_QueueEntry] = []
@@ -1200,28 +1208,45 @@ async def ws_queue(ws: WebSocket):
     matched_role: Optional[str] = None
     my_entry: Optional[_QueueEntry] = None
 
+    # Получаем elo игрока для matchmaking
+    my_elo = 1000.0
+    db2 = SessionLocal()
+    try:
+        pp = db2.query(Player).filter(Player.id == player_id).first()
+        if pp and pp.reflex_elo is not None:
+            my_elo = float(pp.reflex_elo)
+    finally:
+        db2.close()
+
     async with _queue_lock:
         _cleanup_expired()
+        now_t = time.time()
         opponent_entry = None
+        best_i = -1
+        best_diff = 99999.0
         for i, e in enumerate(_queue):
-            if e.stake == stake and e.mode == mode and e.player_id != player_id:
-                opponent_entry = _queue.pop(i)
-                break
+            if e.stake != stake or e.mode != mode or e.player_id == player_id:
+                continue
+            waited = now_t - e.joined
+            allowed = _elo_tolerance_for_wait(waited)
+            diff = abs(e.elo - my_elo)
+            if diff <= allowed and diff < best_diff:
+                best_diff = diff
+                best_i = i
+        if best_i >= 0:
+            opponent_entry = _queue.pop(best_i)
         if opponent_entry is not None:
-            # Я — p2. Создаю комнату, сигналю p1.
             room_id = _gen_room()
             room = ReflexRoom(room_id, opponent_entry.player_id, player_id, stake,
                               opponent_entry.ws, ws, mode=mode)
             _rooms[room_id] = room
-            # Передаём p1'у информацию о комнате
             opponent_entry.room_holder["room"] = room
             opponent_entry.room_holder["role"] = "p1"
             opponent_entry.event.set()
             matched_room = room
             matched_role = "p2"
         else:
-            # Я — p1. Встаю в очередь.
-            my_entry = _QueueEntry(ws, player_id, stake, mode=mode)
+            my_entry = _QueueEntry(ws, player_id, stake, mode=mode, elo=my_elo)
             _queue.append(my_entry)
 
     if matched_room is None:

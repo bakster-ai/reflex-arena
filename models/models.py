@@ -101,6 +101,41 @@ class ReflexDailyChallenge(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class ReflexLoginStreak(Base):
+    """Ежедневный login streak. Один ряд на игрока."""
+    __tablename__ = "reflex_login_streaks"
+
+    id               = Column(Integer, primary_key=True, index=True)
+    player_id        = Column(Integer, ForeignKey("players.id"), nullable=False, unique=True, index=True)
+    current_streak   = Column(Integer, default=0)
+    max_streak       = Column(Integer, default=0)
+    last_login_date  = Column(String, nullable=True)   # YYYY-MM-DD
+    last_claimed_date = Column(String, nullable=True)  # YYYY-MM-DD
+    total_days_logged = Column(Integer, default=0)
+
+
+class ReflexEvent(Base):
+    """Продуктовая аналитика. Event-log."""
+    __tablename__ = "reflex_events"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    player_id  = Column(Integer, ForeignKey("players.id"), nullable=True, index=True)
+    event_type = Column(String, nullable=False, index=True)
+    payload    = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class ReflexPushSubscription(Base):
+    """Web Push subscriptions (PWA push)."""
+    __tablename__ = "reflex_push_subscriptions"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    player_id   = Column(Integer, ForeignKey("players.id"), nullable=False, index=True)
+    endpoint    = Column(String, nullable=False, unique=True)
+    keys_json   = Column(JSON, nullable=False)  # {auth, p256dh}
+    created_at  = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class ReflexFriend(Base):
     __tablename__ = "reflex_friends"
 

@@ -1403,6 +1403,11 @@
       </div>
 
       <div class="lobby">
+        <div class="panel" id="streak-panel">
+          <h3>Ежедневный стрик 🔥</h3>
+          <div id="streak-block"><div style="color:var(--muted);font-size:13px;">Загрузка...</div></div>
+        </div>
+
         <div class="panel" id="bp-panel">
           <h3>Battle Pass ⚔️</h3>
           <div id="bp-summary"><div style="color:var(--muted);font-size:13px;">Загрузка...</div></div>
@@ -1411,6 +1416,11 @@
         <div class="panel">
           <h3>Испытание дня 🔥</h3>
           <div id="dc-block"><div style="color: var(--muted); font-size: 13px;">Загрузка...</div></div>
+        </div>
+
+        <div class="panel" id="activity-panel">
+          <h3>Активность</h3>
+          <div id="activity-block"><div style="color:var(--muted);font-size:13px;">Загрузка...</div></div>
         </div>
       </div>
     </div>
@@ -1765,7 +1775,7 @@ function switchTab(tab, opts = {}) {
     loadCases(); loadShopThemes(); loadShopVfx(); loadShopAvatars(); loadReferralInfo();
   }
   if (tab === 'home') {
-    loadBattlePass(); loadDailyChallenge();
+    loadBattlePass(); loadDailyChallenge(); loadStreak(); loadActivityFeed();
   }
 }
 
@@ -1903,6 +1913,9 @@ async function boot() {
   // Один раз загружаем всё (для первого отображения home-card и индикаторов)
   loadLeaderboard();
   loadBattlePass();
+  loadStreak();
+  loadActivityFeed();
+  logEvent('app_open', { is_guest: !!(ME && ME.is_guest) });
   loadShopThemes();
   loadShopVfx();
   loadShopAvatars();
@@ -2992,6 +3005,108 @@ function playVictoryVfx(kind) {
 }
 
 // ─── Battle Pass ───
+// ─── Daily Streak ───
+async function loadStreak() {
+  try {
+    const r = await API.get('/api/streak');
+    if (!r.authenticated) return;
+    const blk = $('streak-block');
+    if (!blk) return;
+    const fireIcons = '🔥'.repeat(Math.min(7, r.current_streak || 0)) || '•';
+    const btn = r.already_claimed_today
+      ? `<span style="color:var(--muted);font-size:12px;">Завтра: +${r.next_reward_tomorrow} 💰</span>`
+      : `<button onclick="claimStreak()" style="background:linear-gradient(90deg,var(--accent),var(--accent2));color:#1a1205;border:none;padding:10px 18px;border-radius:10px;font-weight:800;cursor:pointer;">Забрать ${r.today_reward} 💰</button>`;
+    blk.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:22px;font-weight:800;">${fireIcons} ${r.current_streak} дн.</div>
+          <div style="font-size:12px;color:var(--muted);">Рекорд: ${r.max_streak} • Всего заходов: ${r.total_days}</div>
+        </div>
+        <div>${btn}</div>
+      </div>
+    `;
+  } catch (e) {}
+}
+async function claimStreak() {
+  const r = await API.post('/api/streak/claim', {});
+  if (r.ok) {
+    hap('success');
+    ME.coins = r.new_coins; renderTop();
+    loadStreak();
+    const t = document.createElement('div');
+    t.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#26d67f;color:#0e0f13;padding:12px 22px;border-radius:20px;font-weight:700;z-index:4000;';
+    t.textContent = `🎁 +${r.reward} 💰 • стрик ${r.streak} дн.`;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2500);
+  } else {
+    alert(r.msg || 'Ошибка');
+  }
+}
+
+// ─── Activity feed (последние матчи на платформе) ───
+async function loadActivityFeed() {
+  try {
+    const matches = await API.get('/api/matches?limit=8');
+    const blk = $('activity-block');
+    if (!blk || !Array.isArray(matches)) return;
+    if (matches.length === 0) {
+      blk.innerHTML = '<div style="color:var(--muted);font-size:13px;">Ещё нет завершённых матчей.</div>';
+      return;
+    }
+    blk.innerHTML = matches.map(m => {
+      const winnerSide = m.winner_id ? (m.p1 === m.winner_id_nick ? 'p1' : 'p2') : null;
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">
+          <div><b>${escapeHtml(m.p1)}</b> <span style="color:var(--muted);">vs</span> <b>${escapeHtml(m.p2)}</b></div>
+          <div style="font-weight:800;color:var(--accent2);">${m.score}</div>
+        </div>
+      `;
+    }).join('');
+  } catch (e) {}
+}
+
+// ─── Event logging: fire-and-forget аналитика ───
+function logEvent(type, payload) {
+  try {
+    fetch('/api/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (API.token() || '') },
+      body: JSON.stringify({ type, payload: payload || {} }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+// ─── Push subscription (Web Push через Service Worker) ───
+async function requestPushSubscription() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const keyResp = await API.get('/api/push/vapid_key');
+    if (!keyResp.key) return;  // VAPID ключ не настроен на сервере
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') return;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlB64ToUint8(keyResp.key),
+    });
+    const subJson = sub.toJSON();
+    await API.post('/api/push/subscribe', {
+      endpoint: subJson.endpoint,
+      keys: subJson.keys,
+    });
+    hap('success');
+  } catch (e) { console.error('push fail', e); }
+}
+function urlB64ToUint8(b64) {
+  const padding = '='.repeat((4 - b64.length % 4) % 4);
+  const base64 = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
 async function loadBattlePass() {
   try {
     const d = await API.get('/api/pass');
