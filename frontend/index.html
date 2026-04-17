@@ -858,6 +858,163 @@
     .auth-prompt .hint { color: var(--muted); font-size: 12px; margin-top: 14px; }
 
     /* ═══════════════════════════════════════════════════════════════
+       НАВИГАЦИЯ: главная с 4 кнопками + нижний таббар
+       ═══════════════════════════════════════════════════════════════ */
+
+    /* Home grid — 4 большие карточки */
+    .home-hero {
+      text-align: center;
+      padding: 20px 12px 16px;
+    }
+    .home-hero h1 {
+      font-size: 32px;
+      margin: 8px 0 4px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .home-hero .sub { color: var(--muted); font-size: 14px; margin-bottom: 8px; }
+    .home-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+      max-width: 560px; margin: 0 auto 16px; padding: 0 12px;
+    }
+    .home-card {
+      background: var(--panel);
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 16px;
+      cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-decoration: none;
+      color: var(--text);
+      transition: transform 0.12s, border-color 0.12s, background 0.12s;
+      min-height: 130px;
+    }
+    .home-card:active { transform: scale(0.96); border-color: var(--accent); }
+    .home-card .ic { font-size: 40px; margin-bottom: 8px; }
+    .home-card .t { font-weight: 800; font-size: 17px; }
+    .home-card .d { color: var(--muted); font-size: 12px; margin-top: 4px; text-align: center; }
+    .home-card.primary {
+      grid-column: 1 / -1;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #1a1205;
+      border: none;
+      box-shadow: 0 8px 24px rgba(255,122,41,0.35);
+    }
+    .home-card.primary .d { color: rgba(26,18,5,0.7); }
+
+    /* Бейджи внутри home-cards */
+    .home-card .badge {
+      position: absolute; top: 8px; right: 10px;
+      background: var(--accent); color: #1a1205;
+      padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 800;
+    }
+    .home-card { position: relative; }
+
+    /* Tabs: показываем только активный data-tab-content */
+    #screen-app [data-tab-content] { display: none; }
+    #screen-app[data-tab="home"] [data-tab-content="home"],
+    #screen-app[data-tab="play"] [data-tab-content="play"],
+    #screen-app[data-tab="profile"] [data-tab-content="profile"],
+    #screen-app[data-tab="shop"] [data-tab-content="shop"],
+    #screen-app[data-tab="lb"] [data-tab-content="lb"] { display: block; }
+
+    /* Bottom tab bar — только на screen-app */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      display: flex;
+      padding: 6px 0;
+      padding-bottom: calc(6px + env(safe-area-inset-bottom));
+      z-index: 500;
+      display: none;
+    }
+    #screen-app.active ~ .bottom-nav,
+    body[data-screen="app"] .bottom-nav { display: flex; }
+    .bottom-nav button {
+      flex: 1;
+      background: transparent; border: none; cursor: pointer;
+      color: var(--muted);
+      padding: 8px 0;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      font-size: 10px;
+    }
+    .bottom-nav button .nic { font-size: 22px; }
+    .bottom-nav button.active { color: var(--accent); }
+    .bottom-nav button:active { transform: scale(0.92); }
+
+    /* Отступ снизу app чтобы контент не залезал под таббар */
+    #screen-app.active { padding-bottom: 62px; }
+
+    /* Вернуть normal lobby — убрать лишние отступы */
+    .lobby { margin-top: 0; }
+
+    /* Большие section-заголовки внутри tab */
+    .tab-head {
+      max-width: 720px; margin: 0 auto; padding: 16px 12px 4px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .tab-head h2 {
+      margin: 0; font-size: 22px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+
+    /* Auth модалка — поверх любого экрана */
+    .auth-modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+      z-index: 2500; display: none; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .auth-modal-overlay.open { display: flex; }
+    .auth-modal {
+      background: var(--panel); border: 1.5px solid var(--border);
+      border-radius: 16px; padding: 22px; max-width: 380px; width: 100%;
+    }
+    .auth-tabs {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+      background: var(--panel2); border-radius: 10px; padding: 4px; margin-bottom: 16px;
+    }
+    .auth-tab {
+      padding: 10px; border: none; background: transparent;
+      color: var(--muted); font-weight: 700; cursor: pointer; border-radius: 8px;
+      font-size: 14px;
+    }
+    .auth-tab.active { background: var(--accent); color: #1a1205; }
+    .auth-modal input {
+      width: 100%; padding: 12px; margin-bottom: 10px;
+      background: var(--panel2); border: 1.5px solid var(--border);
+      color: var(--text); border-radius: 10px; font-size: 14px;
+    }
+    .auth-modal .submit {
+      width: 100%; padding: 14px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      color: #1a1205; border: none; border-radius: 10px;
+      font-weight: 800; font-size: 15px; cursor: pointer;
+    }
+    .auth-modal .guest-link {
+      display: block; text-align: center; margin-top: 14px;
+      color: var(--win); font-size: 13px; cursor: pointer; text-decoration: none;
+    }
+    .auth-modal .close-x {
+      position: absolute; top: 12px; right: 12px;
+      background: transparent; border: none; color: var(--muted);
+      font-size: 22px; cursor: pointer; padding: 4px 10px;
+    }
+    .auth-modal { position: relative; }
+
+    /* Leaderboard category pills */
+    .lb-cat-btn {
+      padding: 8px 14px; white-space: nowrap;
+      background: var(--panel2); border: 1.5px solid var(--border);
+      color: var(--text); border-radius: 20px; cursor: pointer;
+      font-size: 13px; font-weight: 600;
+    }
+    .lb-cat-btn.active {
+      background: var(--accent); color: #1a1205; border-color: var(--accent);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
        СТИЛЕВЫЕ ПАКЕТЫ (preview через data-style атрибут на body)
        ═══════════════════════════════════════════════════════════════ */
 
@@ -1121,21 +1278,50 @@
 <body><!--STYLE-PLACEHOLDER-->
 
 <div class="topbar">
-  <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
-    <button class="back-btn" onclick="location.href='/'" style="flex-shrink:0;">←</button>
-    <div class="logo">⚡ <span class="logo-full">REFLEX ARENA</span></div>
-  </div>
+  <div class="logo" onclick="navigateHome()" style="cursor:pointer;">⚡ <span class="logo-full">REFLEX ARENA</span></div>
   <div class="right" id="top-right">
     <span class="chip elo">ELO: <span id="top-elo">—</span></span>
     <span class="chip coins">💰 <span id="top-coins">—</span></span>
-    <span id="top-nick" style="font-weight: 700;"></span>
-    <button id="top-claim-btn" onclick="openClaimModal()" style="display:none;background:linear-gradient(90deg,#26d67f,#7fe3b0);color:#0e0f13;border:none;padding:6px 14px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;">💾 Сохранить</button>
-    <button id="install-btn" onclick="triggerInstall()" style="display:none;background:var(--accent);color:#1a1205;border:none;padding:6px 10px;border-radius:8px;font-weight:700;font-size:11px;cursor:pointer;">📲 Install</button>
+    <span id="top-nick" style="font-weight: 700; display: none;"></span>
+    <!-- Кнопка-меню профиля (для залогиненных) -->
+    <button id="top-profile-btn" onclick="toggleProfileMenu()" style="display:none;background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;">👤</button>
+    <!-- Кнопка "Вход" (для гостей) -->
+    <button id="top-login-btn" onclick="openAuthModal('login')" style="display:none;background:var(--accent);color:#1a1205;border:none;padding:6px 12px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;">Вход</button>
+    <button id="install-btn" onclick="triggerInstall()" style="display:none;background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-weight:700;font-size:11px;cursor:pointer;">📲</button>
+  </div>
+</div>
+
+<!-- Выпадающее меню профиля -->
+<div id="profile-menu" style="display:none;position:fixed;top:54px;right:8px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:8px;z-index:1500;box-shadow:0 8px 20px rgba(0,0,0,0.4);min-width:200px;">
+  <div id="pm-header" style="padding:8px 10px;border-bottom:1px solid var(--border);margin-bottom:4px;">
+    <div style="font-weight:700;" id="pm-nick">—</div>
+    <div style="color:var(--muted);font-size:11px;" id="pm-status">гость</div>
+  </div>
+  <button onclick="showScreen('profile');closeProfileMenu();" style="width:100%;padding:10px;background:transparent;border:none;color:var(--text);text-align:left;border-radius:6px;cursor:pointer;font-size:14px;">👤 Профиль</button>
+  <button onclick="openClaimModal();closeProfileMenu();" id="pm-save-btn" style="width:100%;padding:10px;background:transparent;border:none;color:var(--win);text-align:left;border-radius:6px;cursor:pointer;font-size:14px;display:none;">💾 Сохранить аккаунт</button>
+  <button onclick="openAuthModal('login');closeProfileMenu();" id="pm-switch-btn" style="width:100%;padding:10px;background:transparent;border:none;color:var(--accent);text-align:left;border-radius:6px;cursor:pointer;font-size:14px;display:none;">🔑 Войти в аккаунт</button>
+  <button onclick="doLogout();closeProfileMenu();" id="pm-logout-btn" style="width:100%;padding:10px;background:transparent;border:none;color:var(--lose);text-align:left;border-radius:6px;cursor:pointer;font-size:14px;display:none;">🚪 Выйти</button>
+</div>
+
+<!-- Модалка логина/регистрации (поверх любого экрана) -->
+<div class="auth-modal-overlay" id="auth-modal-overlay">
+  <div class="auth-modal">
+    <button class="close-x" onclick="closeAuthModal()">×</button>
+    <h2 style="margin:0 0 16px;font-size:22px;">Reflex Arena</h2>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="auth-tab-login" onclick="setAuthTab('login')">Вход</button>
+      <button class="auth-tab" id="auth-tab-register" onclick="setAuthTab('register')">Регистрация</button>
+    </div>
+    <input id="am-nick" placeholder="Никнейм" autocomplete="off" />
+    <input id="am-pass" placeholder="Пароль" type="password" autocomplete="off" />
+    <button class="submit" id="am-submit" onclick="submitAuthModal()">Войти</button>
+    <div id="am-err" style="color:var(--lose);font-size:13px;min-height:18px;margin-top:8px;"></div>
+    <a class="guest-link" href="#" onclick="loginAsGuest();closeAuthModal();return false;">Или играть как гость →</a>
   </div>
 </div>
 
 <div class="app">
-  <!-- ── Auth screen ── -->
+  <!-- ── Auth screen (fallback на случай если guest_login не сработал) ── -->
   <div class="screen" id="screen-auth">
     <div class="auth-prompt">
       <h2 id="auth-title">Войти в Reflex Arena</h2>
@@ -1152,155 +1338,230 @@
     </div>
   </div>
 
-  <!-- ── Lobby ── -->
-  <div class="screen" id="screen-lobby">
-    <div class="lobby">
-      <div id="guest-banner" style="display:none;background:linear-gradient(90deg,rgba(38,214,127,0.15),rgba(127,227,176,0.08));border:1px solid #26d67f;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-          <div>
-            <div style="font-weight:700;color:#26d67f;">🎁 Сохрани прогресс — получи +100 💰</div>
-            <div style="font-size:13px;color:var(--muted);margin-top:4px;">Ты играешь как гость. Создай аккаунт чтобы не потерять рейтинг и предметы.</div>
+  <!-- ═══ Main app with 5 tabs ═══ -->
+  <div class="screen" id="screen-app" data-tab="home">
+
+    <!-- ═══ HOME TAB ═══ -->
+    <div data-tab-content="home">
+      <div class="home-hero">
+        <h1>Reflex Arena</h1>
+        <div class="sub">1v1 на реакцию • 5 категорий • 20 мини-игр</div>
+      </div>
+
+      <div id="guest-banner-home" style="display:none;max-width:560px;margin:0 auto 14px;padding:0 12px;">
+        <div style="background:linear-gradient(90deg,rgba(38,214,127,0.15),rgba(127,227,176,0.08));border:1px solid #26d67f;border-radius:12px;padding:14px 16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+            <div>
+              <div style="font-weight:700;color:#26d67f;font-size:14px;">🎁 Сохрани прогресс — +100 💰</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:2px;">Ты играешь как гость. Создай аккаунт чтобы не потерять рейтинг и предметы.</div>
+            </div>
+            <button class="stake-btn selected" style="white-space:nowrap;font-size:12px;padding:8px 14px;" onclick="openClaimModal()">Сохранить →</button>
           </div>
-          <button class="stake-btn selected" style="white-space:nowrap;" onclick="openClaimModal()">Сохранить →</button>
-        </div>
-      </div>
-      <h1>1v1 на реакцию</h1>
-      <div class="sub">Best of 5 • случайные мини-игры • победитель забирает банк</div>
-
-      <div class="panel">
-        <h3>Ставка</h3>
-        <div class="stake-row" id="stake-row">
-          <button class="stake-btn selected" data-stake="0">Бесплатно</button>
-          <button class="stake-btn" data-stake="10">10 💰</button>
-          <button class="stake-btn" data-stake="50">50 💰</button>
-          <button class="stake-btn" data-stake="200">200 💰</button>
-        </div>
-        <input class="stake-custom" id="stake-custom" type="number" min="0" max="1000" placeholder="Своя ставка (0–1000)" />
-        <button class="play-btn" id="play-btn" onclick="findMatch()">Найти матч</button>
-        <button class="play-btn" onclick="findDeathmatch()" style="background:linear-gradient(90deg,#ff4d6d,#ff7a29);color:#fff;margin-top:8px;box-shadow:0 6px 20px rgba(255,77,109,0.35);">💀 Deathmatch Bo15 (≥200 💰)</button>
-      </div>
-
-      <div class="panel" id="bp-panel">
-        <h3>Battle Pass ⚔️</h3>
-        <div id="bp-summary"><div style="color:var(--muted);font-size:13px;">Загрузка...</div></div>
-      </div>
-
-      <div class="panel">
-        <h3>Магазин тем 🎨</h3>
-        <div id="shop-themes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;"></div>
-      </div>
-
-      <div class="panel">
-        <h3>Победные эффекты 🎆</h3>
-        <div style="color:var(--muted);font-size:12px;margin-bottom:10px;">Играет при твоей победе в матче.</div>
-        <div id="shop-vfx" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;"></div>
-      </div>
-
-      <div class="panel">
-        <h3>Аватары 🦊</h3>
-        <div id="shop-avatars" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px;"></div>
-      </div>
-
-      <div class="panel">
-        <h3>Испытание дня 🔥</h3>
-        <div id="dc-block">
-          <div style="color: var(--muted); font-size: 13px;">Загрузка...</div>
         </div>
       </div>
 
-      <div class="panel">
-        <h3>Сыграть с другом</h3>
-        <div style="color: var(--muted); font-size: 13px; margin-bottom: 10px;">
-          Создай комнату — кинь ссылку другу. Как только он откроет — матч стартует.
+      <div class="home-grid">
+        <div class="home-card primary" onclick="switchTab('play')">
+          <div class="ic">🎮</div>
+          <div class="t">Играть</div>
+          <div class="d">Матчмейкинг, бот, с другом</div>
         </div>
-        <button class="play-btn" onclick="createCustomRoom()" style="background:linear-gradient(90deg,#7dd3fc,#a78bfa);color:#0e0f13;">🔗 Создать комнату</button>
-      </div>
-
-      <div class="panel">
-        <h3>Практика с ботом</h3>
-        <div style="color: var(--muted); font-size: 13px; margin-bottom: 10px;">Без ставок и рейтинга. Потренируйся.</div>
-        <div class="stake-row">
-          <button class="stake-btn" onclick="playVsAi('easy')" style="font-size:13px;">🤖 Новичок</button>
-          <button class="stake-btn" onclick="playVsAi('medium')" style="font-size:13px;">🤖 Средний</button>
-          <button class="stake-btn" onclick="playVsAi('hard')" style="font-size:13px;">🤖 Мастер</button>
-          <button class="stake-btn" disabled style="opacity:0.4;font-size:13px;">Скоро</button>
+        <div class="home-card" onclick="switchTab('profile')">
+          <div class="ic">👤</div>
+          <div class="t">Профиль</div>
+          <div class="d">Статистика, коллекция</div>
         </div>
-      </div>
-
-      <div class="panel">
-        <h3>Моя статистика</h3>
-        <div class="stats-row">
-          <div class="stat"><div class="v" id="st-elo">—</div><div class="l">ELO</div></div>
-          <div class="stat"><div class="v" id="st-wins">—</div><div class="l">Победы</div></div>
-          <div class="stat"><div class="v" id="st-losses">—</div><div class="l">Поражения</div></div>
-          <div class="stat"><div class="v" id="st-wr">—</div><div class="l">Winrate</div></div>
+        <div class="home-card" onclick="switchTab('shop')">
+          <div class="ic">🛒</div>
+          <div class="t">Магазин</div>
+          <div class="d">Кейсы, темы, аватары</div>
+        </div>
+        <div class="home-card" onclick="switchTab('lb')">
+          <div class="ic">🏆</div>
+          <div class="t">Топ</div>
+          <div class="d">Лидерборд</div>
         </div>
       </div>
 
-      <div class="panel">
-        <h3>Задания на сегодня</h3>
-        <div id="daily-list"></div>
-      </div>
-
-      <div class="panel">
-        <h3>Друзья</h3>
-        <div style="display:flex;gap:6px;margin-bottom:10px;">
-          <input id="friend-nick" placeholder="Ник друга" autocomplete="off" style="flex:1;padding:10px;background:var(--panel2);border:1.5px solid var(--border);color:var(--text);border-radius:8px;font-size:14px;" />
-          <button class="stake-btn" style="width:auto;padding:10px 14px;font-size:13px;" onclick="addFriend()">+ Добавить</button>
+      <div class="lobby">
+        <div class="panel" id="bp-panel">
+          <h3>Battle Pass ⚔️</h3>
+          <div id="bp-summary"><div style="color:var(--muted);font-size:13px;">Загрузка...</div></div>
         </div>
-        <div id="friends-list"></div>
-      </div>
 
-      <div class="panel">
-        <h3>Достижения</h3>
-        <div id="ach-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;"></div>
-      </div>
-
-      <div class="panel">
-        <h3>Последние матчи</h3>
-        <div id="recent-list"><div style="color: var(--muted); font-size: 13px;">Ещё нет матчей</div></div>
-      </div>
-
-      <div class="panel">
-        <h3>Кейсы 📦</h3>
-        <div style="color:var(--muted);font-size:12px;margin-bottom:10px;">Открой кейс — получи предмет в коллекцию. Дубликат = монеты.</div>
-        <div id="cases-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;"></div>
-      </div>
-
-      <div class="panel">
-        <h3>Коллекция 🎒 <span id="collection-counter" style="color:var(--accent2);font-weight:400;font-size:12px;"></span></h3>
-        <div id="collection-list"></div>
-      </div>
-
-      <div class="panel">
-        <h3>Рейтинги по категориям</h3>
-        <div id="cat-elo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;"></div>
-      </div>
-
-      <div class="panel" id="referral-panel">
-        <h3>Пригласи друга — +100 💰 обоим</h3>
-        <div style="color: var(--muted); font-size: 13px; margin-bottom: 10px;">
-          Друг регистрируется по твоей ссылке → оба получают бонус монет.
-        </div>
-        <div style="display: flex; gap: 8px;">
-          <input id="ref-link" readonly style="flex:1;min-width:0;padding:10px;background:var(--panel2);border:1.5px solid var(--border);color:var(--text);border-radius:8px;font-size:13px;" />
-          <button class="stake-btn" style="width:auto;padding:10px 16px;font-size:13px;" onclick="copyRefLink()">Скопировать</button>
-        </div>
-        <div id="ref-info" style="color: var(--muted); font-size: 12px; margin-top: 10px;"></div>
-      </div>
-
-      <div class="panel">
-        <h3>Топ игроков</h3>
-        <div style="overflow-x: auto;">
-          <table class="lb-table">
-            <thead>
-              <tr><th>#</th><th>Игрок</th><th style="text-align: right;">ELO</th><th style="text-align: right;">W/L</th></tr>
-            </thead>
-            <tbody id="lb-body"></tbody>
-          </table>
+        <div class="panel">
+          <h3>Испытание дня 🔥</h3>
+          <div id="dc-block"><div style="color: var(--muted); font-size: 13px;">Загрузка...</div></div>
         </div>
       </div>
     </div>
+
+    <!-- ═══ PLAY TAB ═══ -->
+    <div data-tab-content="play">
+      <div class="tab-head"><h2>🎮 Играть</h2></div>
+      <div class="lobby">
+        <div class="panel">
+          <h3>Рейтинговый матч</h3>
+          <div style="color:var(--muted);font-size:12px;margin-bottom:10px;">Best of 5 • случайные мини-игры • победитель забирает банк.</div>
+          <div class="stake-row" id="stake-row">
+            <button class="stake-btn selected" data-stake="0">Бесплатно</button>
+            <button class="stake-btn" data-stake="10">10 💰</button>
+            <button class="stake-btn" data-stake="50">50 💰</button>
+            <button class="stake-btn" data-stake="200">200 💰</button>
+          </div>
+          <input class="stake-custom" id="stake-custom" type="number" min="0" max="1000" placeholder="Своя ставка (0–1000)" />
+          <button class="play-btn" id="play-btn" onclick="findMatch()">Найти матч</button>
+          <button class="play-btn" onclick="findDeathmatch()" style="background:linear-gradient(90deg,#ff4d6d,#ff7a29);color:#fff;margin-top:8px;box-shadow:0 6px 20px rgba(255,77,109,0.35);">💀 Deathmatch Bo15 (≥200 💰)</button>
+        </div>
+
+        <div class="panel">
+          <h3>Сыграть с другом 🔗</h3>
+          <div style="color:var(--muted);font-size:13px;margin-bottom:10px;">Создай комнату — кинь ссылку другу. Как только он откроет — матч стартует.</div>
+          <button class="play-btn" onclick="createCustomRoom()" style="background:linear-gradient(90deg,#7dd3fc,#a78bfa);color:#0e0f13;">Создать комнату</button>
+        </div>
+
+        <div class="panel">
+          <h3>Практика с ботом 🤖</h3>
+          <div style="color:var(--muted);font-size:13px;margin-bottom:10px;">Без ставок и рейтинга. Потренируйся.</div>
+          <div class="stake-row">
+            <button class="stake-btn" onclick="playVsAi('easy')" style="font-size:13px;">Новичок</button>
+            <button class="stake-btn" onclick="playVsAi('medium')" style="font-size:13px;">Средний</button>
+            <button class="stake-btn" onclick="playVsAi('hard')" style="font-size:13px;">Мастер</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PROFILE TAB ═══ -->
+    <div data-tab-content="profile">
+      <div class="tab-head"><h2>👤 Профиль</h2></div>
+      <div class="lobby">
+        <div class="panel">
+          <h3>Моя статистика</h3>
+          <div class="stats-row">
+            <div class="stat"><div class="v" id="st-elo">—</div><div class="l">ELO</div></div>
+            <div class="stat"><div class="v" id="st-wins">—</div><div class="l">Победы</div></div>
+            <div class="stat"><div class="v" id="st-losses">—</div><div class="l">Поражения</div></div>
+            <div class="stat"><div class="v" id="st-wr">—</div><div class="l">Winrate</div></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Рейтинги по категориям</h3>
+          <div id="cat-elo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Коллекция 🎒 <span id="collection-counter" style="color:var(--accent2);font-weight:400;font-size:12px;"></span></h3>
+          <div id="collection-list"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Достижения</h3>
+          <div id="ach-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Задания на сегодня</h3>
+          <div id="daily-list"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Друзья</h3>
+          <div style="display:flex;gap:6px;margin-bottom:10px;">
+            <input id="friend-nick" placeholder="Ник друга" autocomplete="off" style="flex:1;min-width:0;padding:10px;background:var(--panel2);border:1.5px solid var(--border);color:var(--text);border-radius:8px;font-size:14px;" />
+            <button class="stake-btn" style="width:auto;padding:10px 14px;font-size:13px;" onclick="addFriend()">+ Добавить</button>
+          </div>
+          <div id="friends-list"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Последние матчи</h3>
+          <div id="recent-list"><div style="color: var(--muted); font-size: 13px;">Ещё нет матчей</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SHOP TAB ═══ -->
+    <div data-tab-content="shop">
+      <div class="tab-head"><h2>🛒 Магазин</h2></div>
+      <div class="lobby">
+        <div class="panel">
+          <h3>Кейсы 📦</h3>
+          <div style="color:var(--muted);font-size:12px;margin-bottom:10px;">Открой кейс — получи предмет в коллекцию. Дубликат = монеты.</div>
+          <div id="cases-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Battle Pass ⚔️</h3>
+          <div style="color:var(--muted);font-size:12px;margin-bottom:8px;">Награды за активность — 30 уровней × 2 дорожки.</div>
+          <button class="play-btn" onclick="openBP()" style="font-size:14px;padding:12px;">Открыть Battle Pass →</button>
+        </div>
+
+        <div class="panel">
+          <h3>Магазин тем 🎨</h3>
+          <div id="shop-themes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Победные эффекты 🎆</h3>
+          <div style="color:var(--muted);font-size:12px;margin-bottom:10px;">Играет при твоей победе в матче.</div>
+          <div id="shop-vfx" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Аватары 🦊</h3>
+          <div id="shop-avatars" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px;"></div>
+        </div>
+
+        <div class="panel" id="referral-panel">
+          <h3>Пригласи друга — +100 💰 обоим</h3>
+          <div style="color: var(--muted); font-size: 13px; margin-bottom: 10px;">
+            Друг регистрируется по твоей ссылке → оба получают бонус монет.
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <input id="ref-link" readonly style="flex:1;min-width:0;padding:10px;background:var(--panel2);border:1.5px solid var(--border);color:var(--text);border-radius:8px;font-size:13px;" />
+            <button class="stake-btn" style="width:auto;padding:10px 16px;font-size:13px;" onclick="copyRefLink()">Скопировать</button>
+          </div>
+          <div id="ref-info" style="color: var(--muted); font-size: 12px; margin-top: 10px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ LEADERBOARD TAB ═══ -->
+    <div data-tab-content="lb">
+      <div class="tab-head"><h2>🏆 Топ игроков</h2></div>
+      <div class="lobby">
+        <div class="panel">
+          <div id="lb-cat-switcher" style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;">
+            <button onclick="switchLbCategory('overall')" data-lbcat="overall" class="lb-cat-btn active">Общий</button>
+            <button onclick="switchLbCategory('reaction')" data-lbcat="reaction" class="lb-cat-btn">🔴</button>
+            <button onclick="switchLbCategory('logic')" data-lbcat="logic" class="lb-cat-btn">🟡</button>
+            <button onclick="switchLbCategory('memory')" data-lbcat="memory" class="lb-cat-btn">🟢</button>
+            <button onclick="switchLbCategory('coordination')" data-lbcat="coordination" class="lb-cat-btn">🔵</button>
+            <button onclick="switchLbCategory('trivia')" data-lbcat="trivia" class="lb-cat-btn">🟣</button>
+          </div>
+          <div style="overflow-x: auto;">
+            <table class="lb-table">
+              <thead>
+                <tr><th>#</th><th>Игрок</th><th style="text-align: right;">ELO</th><th style="text-align: right;">W/L</th></tr>
+              </thead>
+              <tbody id="lb-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom navigation bar — показывается только когда screen-app активен -->
+  <div class="bottom-nav" id="bottom-nav">
+    <button data-tab-btn="home" onclick="switchTab('home')"><span class="nic">🏠</span>Главная</button>
+    <button data-tab-btn="play" onclick="switchTab('play')"><span class="nic">🎮</span>Играть</button>
+    <button data-tab-btn="profile" onclick="switchTab('profile')"><span class="nic">👤</span>Профиль</button>
+    <button data-tab-btn="shop" onclick="switchTab('shop')"><span class="nic">🛒</span>Магазин</button>
+    <button data-tab-btn="lb" onclick="switchTab('lb')"><span class="nic">🏆</span>Топ</button>
   </div>
 
   <!-- ── Queue ── -->
@@ -1456,11 +1717,143 @@ function hap(kind) {
 }
 
 function showScreen(id) {
+  // Совместимость: если передан 'lobby' / 'home' / 'play' / 'profile' / 'shop' / 'lb'
+  // — показываем screen-app и переключаем таб внутри него
+  const appTabs = ['home', 'play', 'profile', 'shop', 'lb'];
+  const targetId = (id === 'lobby' || appTabs.includes(id)) ? 'app' : id;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  $('screen-' + id).classList.add('active');
+  const el = $('screen-' + targetId);
+  if (el) el.classList.add('active');
+  // body[data-screen] нужен для CSS (показать bottom-nav только на app)
+  document.body.dataset.screen = targetId;
   // Прячем панель эмоутов при выходе из матча
   const ep = $('emote-panel');
   if (ep) ep.classList.add('hidden');
+  // Таб внутри app
+  if (appTabs.includes(id)) {
+    switchTab(id, {noScroll: false});
+  } else if (id === 'lobby') {
+    switchTab('home', {noScroll: true});
+  }
+}
+
+function switchTab(tab, opts = {}) {
+  const app = $('screen-app');
+  if (!app) return;
+  app.dataset.tab = tab;
+  // Подсветка активной кнопки в bottom-nav
+  document.querySelectorAll('.bottom-nav button').forEach(b => {
+    b.classList.toggle('active', b.dataset.tabBtn === tab);
+  });
+  if (!opts.noScroll) window.scrollTo(0, 0);
+  // Ленивая загрузка того что может устареть
+  if (tab === 'lb') loadLeaderboard();
+  if (tab === 'profile') {
+    loadCategoryElo(); loadDailyTasks(); loadCollection(); loadAchievements(); loadFriends();
+  }
+  if (tab === 'shop') {
+    loadCases(); loadShopThemes(); loadShopVfx(); loadShopAvatars(); loadReferralInfo();
+  }
+  if (tab === 'home') {
+    loadBattlePass(); loadDailyChallenge();
+  }
+}
+
+function navigateHome() {
+  if ($('screen-app').classList.contains('active')) {
+    switchTab('home');
+  } else {
+    // В середине матча — не выходим, спрашиваем
+    if ($('screen-match').classList.contains('active')) {
+      if (!confirm('Выйти из матча? Засчитается поражение.')) return;
+    }
+    showScreen('app');
+    switchTab('home');
+  }
+}
+
+// ─── Auth модалка ───
+let _authModalMode = 'login';
+function openAuthModal(mode = 'login') {
+  _authModalMode = mode;
+  setAuthTab(mode);
+  $('am-nick').value = '';
+  $('am-pass').value = '';
+  $('am-err').textContent = '';
+  $('auth-modal-overlay').classList.add('open');
+  setTimeout(() => $('am-nick').focus(), 100);
+}
+function closeAuthModal() { $('auth-modal-overlay').classList.remove('open'); }
+function setAuthTab(mode) {
+  _authModalMode = mode;
+  $('auth-tab-login').classList.toggle('active', mode === 'login');
+  $('auth-tab-register').classList.toggle('active', mode === 'register');
+  $('am-submit').textContent = mode === 'login' ? 'Войти' : 'Зарегистрироваться';
+  $('am-err').textContent = '';
+}
+async function submitAuthModal() {
+  const nick = $('am-nick').value.trim();
+  const pass = $('am-pass').value;
+  $('am-err').textContent = '';
+  if (!nick || !pass) { $('am-err').textContent = 'Введи никнейм и пароль'; return; }
+  const url = _authModalMode === 'register' ? '/api/auth/register' : '/api/auth/login';
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nickname: nick, password: pass }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      $('am-err').textContent = data.detail || (_authModalMode === 'register' ? 'Ошибка регистрации' : 'Ошибка входа');
+      return;
+    }
+    API.setToken(data.token);
+    closeAuthModal();
+    hap('success');
+    // Перезагружаем app-state: чистим ME и boot заново
+    ME = null;
+    boot();
+  } catch (e) {
+    $('am-err').textContent = 'Ошибка сети';
+  }
+}
+
+// ─── Меню профиля (dropdown) ───
+function toggleProfileMenu() {
+  const m = $('profile-menu');
+  if (!m) return;
+  m.style.display = (m.style.display === 'block') ? 'none' : 'block';
+}
+function closeProfileMenu() {
+  const m = $('profile-menu');
+  if (m) m.style.display = 'none';
+}
+// Закрытие по клику вне меню
+document.addEventListener('click', (e) => {
+  const m = $('profile-menu');
+  if (!m || m.style.display !== 'block') return;
+  if (e.target.closest('#profile-menu') || e.target.closest('#top-profile-btn')) return;
+  m.style.display = 'none';
+});
+
+async function doLogout() {
+  if (!confirm('Выйти из аккаунта?')) return;
+  API.clearToken();
+  ME = null;
+  hap('tap');
+  // Создаём нового гостя автоматически
+  boot();
+}
+
+// ─── Лидерборд: переключение категорий ───
+let _lbCategory = 'overall';
+async function switchLbCategory(cat) {
+  _lbCategory = cat;
+  document.querySelectorAll('[data-lbcat]').forEach(b => {
+    b.classList.toggle('active', b.dataset.lbcat === cat);
+  });
+  loadLeaderboard();
 }
 
 async function boot() {
@@ -1495,7 +1888,9 @@ async function boot() {
   }
   renderTop();
   renderLobby();
-  showScreen('lobby');
+  showScreen('app');
+  switchTab('home');
+  // Один раз загружаем всё (для первого отображения home-card и индикаторов)
   loadLeaderboard();
   loadBattlePass();
   loadShopThemes();
@@ -1641,21 +2036,52 @@ window.addEventListener('pageshow', () => maybeRejoinOnVisible());
 
 function renderTop() {
   if (!ME) return;
-  $('top-nick').textContent = ME.nickname || '';
-  $('top-coins').textContent = ME.coins ?? 0;
+  const nick = ME.nickname || '';
   const elo = ME.elo ?? 1000;
   const l = getLeague(elo);
+  $('top-nick').textContent = nick;
+  $('top-coins').textContent = ME.coins ?? 0;
   $('top-elo').innerHTML = `${l.icon} ${Math.round(elo)}`;
   $('top-elo').style.color = l.color;
-  // Гостевые индикаторы
-  const claimBtn = $('top-claim-btn');
-  const guestBanner = $('guest-banner');
+
+  const loginBtn = $('top-login-btn');
+  const profBtn = $('top-profile-btn');
+  const topNick = $('top-nick');
+  const bannerHome = $('guest-banner-home');
+
+  // Меню профиля
+  const pmNick = $('pm-nick');
+  const pmStatus = $('pm-status');
+  const pmSaveBtn = $('pm-save-btn');
+  const pmSwitchBtn = $('pm-switch-btn');
+  const pmLogoutBtn = $('pm-logout-btn');
+
+  if (pmNick) pmNick.textContent = nick;
+
   if (ME.is_guest) {
-    if (claimBtn) claimBtn.style.display = 'inline-block';
-    if (guestBanner) guestBanner.style.display = 'block';
+    // Гость: "Вход" в шапке + кнопка меню профиля справа (для сохранения)
+    if (loginBtn) loginBtn.style.display = 'inline-block';
+    if (profBtn) profBtn.style.display = 'inline-block';
+    if (topNick) topNick.style.display = 'none';  // не показываем рандомный ник
+    if (bannerHome) bannerHome.style.display = 'block';
+    if (pmStatus) pmStatus.textContent = 'Гость';
+    if (pmSaveBtn) pmSaveBtn.style.display = 'block';
+    if (pmSwitchBtn) pmSwitchBtn.style.display = 'block';
+    if (pmLogoutBtn) pmLogoutBtn.style.display = 'none';
   } else {
-    if (claimBtn) claimBtn.style.display = 'none';
-    if (guestBanner) guestBanner.style.display = 'none';
+    // Залогинен: ник + меню профиля
+    if (loginBtn) loginBtn.style.display = 'none';
+    if (profBtn) profBtn.style.display = 'inline-block';
+    if (topNick) {
+      topNick.style.display = 'inline-block';
+      // На мобилке (узкий экран) — прячем ник чтобы не перегружать
+      if (window.innerWidth < 480) topNick.style.display = 'none';
+    }
+    if (bannerHome) bannerHome.style.display = 'none';
+    if (pmStatus) pmStatus.textContent = 'Аккаунт';
+    if (pmSaveBtn) pmSaveBtn.style.display = 'none';
+    if (pmSwitchBtn) pmSwitchBtn.style.display = 'none';
+    if (pmLogoutBtn) pmLogoutBtn.style.display = 'block';
   }
 }
 
@@ -2618,14 +3044,18 @@ async function tryApplyReferrer() {
 
 async function loadLeaderboard() {
   try {
-    const rows = await API.get('/api/leaderboard?limit=20');
+    const url = (_lbCategory && _lbCategory !== 'overall')
+      ? `/api/leaderboard/category/${_lbCategory}?limit=20`
+      : '/api/leaderboard?limit=20';
+    const rows = await API.get(url);
     if (Array.isArray(rows)) {
+      const showLosses = _lbCategory === 'overall';
       $('lb-body').innerHTML = rows.map(r => `
         <tr>
           <td class="lb-rank">#${r.rank}</td>
           <td>${escapeHtml(r.nickname)} ${leagueBadge(r.elo)}</td>
           <td style="text-align: right; font-weight: 700;">${Math.round(r.elo)}</td>
-          <td style="text-align: right; color: var(--muted);">${r.wins}/${r.losses}</td>
+          <td style="text-align: right; color: var(--muted);">${showLosses ? (r.wins + '/' + r.losses) : (r.wins || 0)}</td>
         </tr>
       `).join('');
       if (rows.length === 0) {
@@ -4767,6 +5197,12 @@ boot();
 // Enter в поле пароля — submit
 $('auth-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') doAuth(); });
 $('auth-nick').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('auth-pass').focus(); });
+// Auth-модалка: Enter = submit
+(function() {
+  const nick = $('am-nick'); const pass = $('am-pass');
+  if (nick) nick.addEventListener('keydown', (e) => { if (e.key === 'Enter') pass.focus(); });
+  if (pass) pass.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitAuthModal(); });
+})();
 
 // ═════════════════════════════════════════════════════════════
 //   Style switcher (плашка внизу для перехода между темами)
