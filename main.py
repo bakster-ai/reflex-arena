@@ -149,6 +149,9 @@ def run_migrations():
             )""",
             "CREATE INDEX IF NOT EXISTS idx_reflex_payments_player ON reflex_payments(player_id)",
             "CREATE INDEX IF NOT EXISTS idx_reflex_payments_ext ON reflex_payments(external_id)",
+            # Индексы под event-фильтры (report, club_chat, club_war, ad_reward, admin_broadcast)
+            "CREATE INDEX IF NOT EXISTS idx_reflex_events_player_type ON reflex_events(player_id, event_type)",
+            "CREATE INDEX IF NOT EXISTS idx_reflex_events_type_created ON reflex_events(event_type, created_at DESC)",
         ]
         # Каждая миграция в своей транзакции — чтобы одна битая не аборнула остальные
         for sql in migrations:
@@ -330,6 +333,143 @@ def _render_index() -> Response:
 @app.get("/")
 def serve_index():
     return _render_index()
+
+
+@app.get("/admin")
+def serve_admin():
+    """Простая админ-страница. Логин через токен в поле ввода."""
+    html = """<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Admin — Reflex Arena</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:#0e0f13;color:#e5e7eb;padding:16px;}
+input,button{background:#1a1d26;border:1px solid #2a2f3a;color:#e5e7eb;padding:8px 12px;border-radius:6px;font-size:14px;}
+.card{background:#1a1d26;border:1px solid #2a2f3a;border-radius:10px;padding:14px;margin-bottom:12px;}
+h1{font-size:20px;margin:0 0 12px;}h2{font-size:16px;margin:0 0 8px;color:#ff7a29;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;}
+.stat{background:#0e0f13;padding:10px;border-radius:8px;}
+.stat .v{font-size:22px;font-weight:800;color:#ffb86b;}.stat .l{font-size:11px;color:#8b92a5;}
+table{width:100%;border-collapse:collapse;}td,th{padding:6px;border-bottom:1px solid #2a2f3a;text-align:left;font-size:13px;}
+</style></head>
+<body>
+<h1>🔧 Reflex Arena — Admin</h1>
+<div class="card">
+  <label>ADMIN_TOKEN</label>
+  <input id="tok" type="password" placeholder="токен из env" style="width:260px;" />
+  <button onclick="load()">Загрузить</button>
+</div>
+<div id="out"></div>
+<div class="card">
+  <h2>🔍 Поиск игрока</h2>
+  <input id="q" placeholder="id или ник" /><button onclick="findP()">Найти</button>
+  <div id="pout"></div>
+</div>
+<div class="card">
+  <h2>📢 Broadcast</h2>
+  <textarea id="bc" placeholder="сообщение всем игрокам" style="width:100%;min-height:60px;background:#0e0f13;color:#e5e7eb;border:1px solid #2a2f3a;border-radius:6px;padding:8px;"></textarea>
+  <button onclick="bcast()">Отправить</button>
+</div>
+<script>
+function H(){return {'Authorization':'Bearer '+document.getElementById('tok').value};}
+async function load(){
+  const r = await fetch('/api/admin/dashboard',{headers:H()}).then(r=>r.json());
+  if(!r.ok){document.getElementById('out').innerHTML='<div style="color:#ff4d6d">'+(r.msg||'err')+'</div>';return;}
+  document.getElementById('out').innerHTML = `
+  <div class="card"><h2>Общая статистика</h2>
+    <div class="grid">
+      <div class="stat"><div class="v">${r.total_players}</div><div class="l">Всего игроков</div></div>
+      <div class="stat"><div class="v">${r.registered}</div><div class="l">Registered</div></div>
+      <div class="stat"><div class="v">${r.guests}</div><div class="l">Guests</div></div>
+      <div class="stat"><div class="v">${r.total_matches}</div><div class="l">Матчей завершено</div></div>
+      <div class="stat"><div class="v">${r.dau}</div><div class="l">DAU (24ч)</div></div>
+      <div class="stat"><div class="v">${r.wau}</div><div class="l">WAU (7д)</div></div>
+      <div class="stat"><div class="v">${r.mau}</div><div class="l">MAU (30д)</div></div>
+      <div class="stat"><div class="v">${r.revenue_stars_completed} ⭐</div><div class="l">Revenue (XTR)</div></div>
+      <div class="stat"><div class="v">${r.revenue_payments_count}</div><div class="l">Платежей</div></div>
+    </div>
+  </div>
+  <div class="card"><h2>Топ event-type за 7 дней</h2>
+    <table><thead><tr><th>Event</th><th>Count</th></tr></thead><tbody>
+    ${(r.top_events_7d||[]).map(e=>`<tr><td>${e.event}</td><td>${e.count}</td></tr>`).join('')}
+    </tbody></table>
+  </div>
+  `;
+}
+async function findP(){
+  const q = document.getElementById('q').value;
+  const r = await fetch('/api/admin/player/'+encodeURIComponent(q),{headers:H()}).then(r=>r.json());
+  if(!r.ok){document.getElementById('pout').innerHTML='<div style="color:#ff4d6d">'+(r.msg||'err')+'</div>';return;}
+  const p = r.player;
+  document.getElementById('pout').innerHTML = `
+    <div style="margin-top:10px;background:#0e0f13;padding:10px;border-radius:8px;">
+    <div><b>#${p.id} ${p.nickname}</b> ${r.tier.icon} ${r.tier.tier_ru} ${r.tier.division}</div>
+    <div>ELO: ${p.elo} • W/L: ${p.wins}/${p.losses} • coins: ${p.coins} • gems: ${p.gems}</div>
+    <div>guest: ${p.is_guest} • создан: ${p.created_at}</div>
+    <div style="color:#ff4d6d">Жалоб на игрока: ${r.reports_against}</div>
+    </div>`;
+}
+async function bcast(){
+  const text = document.getElementById('bc').value.trim();
+  if(!text) return;
+  const r = await fetch('/api/admin/broadcast',{method:'POST',headers:{...H(),'Content-Type':'application/json'},body:JSON.stringify({text})}).then(r=>r.json());
+  alert(r.msg || (r.ok?'queued':'error'));
+}
+</script></body></html>"""
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/replay/{match_id}")
+def serve_replay(match_id: int):
+    """Replay-viewer для матча. Подтягивает /api/replay/{match_id} и воспроизводит раунды."""
+    html = """<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Replay — Reflex Arena</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{margin:0;background:#0e0f13;color:#e5e7eb;font-family:system-ui,-apple-system,sans-serif;padding:20px;}
+.wrap{max-width:720px;margin:0 auto;}
+.card{background:#1a1d26;border:1px solid #2a2f3a;border-radius:12px;padding:16px;margin-bottom:12px;}
+h1{margin:0 0 8px;font-size:22px;}
+.vs{display:flex;justify-content:space-between;align-items:center;}
+.p{font-size:18px;font-weight:800;}.p.w{color:#26d67f;}.p.l{color:#8b92a5;}
+.rnd{background:#0e0f13;border-left:3px solid #ff7a29;padding:10px;margin-bottom:8px;border-radius:0 8px 8px 0;}
+a{color:#ff7a29;}
+</style></head>
+<body><div class="wrap" id="w">Загрузка...</div>
+<script>
+const mid = location.pathname.split('/').pop();
+fetch('/api/replay/'+mid).then(r=>r.json()).then(r=>{
+  if(!r.ok){document.getElementById('w').innerHTML='<div style="color:#ff4d6d">'+(r.msg||'err')+'</div>';return;}
+  const m = r.match;
+  const w = (x)=> m.winner_id === x ? 'w' : 'l';
+  document.getElementById('w').innerHTML = `
+    <div class="card">
+      <h1>Матч #${m.id}</h1>
+      <div class="vs">
+        <div class="p ${w(m.p1.id)}">${m.p1.nickname} (${m.rounds_p1})</div>
+        <div style="color:#8b92a5;">vs</div>
+        <div class="p ${w(m.p2.id)}">(${m.rounds_p2}) ${m.p2.nickname}</div>
+      </div>
+      <div style="color:#8b92a5;font-size:12px;margin-top:8px;">
+        ΔELO: ${m.elo_change_p1>0?'+':''}${m.elo_change_p1} / ${m.elo_change_p2>0?'+':''}${m.elo_change_p2}
+        ${m.finished_at ? ' • '+new Date(m.finished_at).toLocaleString() : ''}
+      </div>
+    </div>
+    <div class="card">
+      <div style="font-size:13px;color:#8b92a5;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">Раунды</div>
+      ${(m.rounds_log||[]).map((r,i)=>`
+        <div class="rnd">
+          <div><b>Раунд ${i+1}</b> — ${r.game||'?'}</div>
+          <div style="font-size:13px;">${m.p1.nickname}: <b>${r.p1_score||0}</b> vs <b>${r.p2_score||0}</b> :${m.p2.nickname}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div style="text-align:center;margin-top:14px;"><a href="/">← На главную</a></div>
+  `;
+});
+</script></body></html>"""
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/{full_path:path}")

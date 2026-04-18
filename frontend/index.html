@@ -8,6 +8,8 @@
   <meta http-equiv="Expires" content="0" />
   <meta name="theme-color" content="#0e0f13" />
   <meta name="mobile-web-app-capable" content="yes" />
+  <!-- Telegram Mini App SDK (no-op если не в TG) -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Reflex" />
@@ -1295,7 +1297,7 @@
 <div class="topbar">
   <div class="logo" onclick="navigateHome()" style="cursor:pointer;">⚡ <span class="logo-full">REFLEX ARENA</span></div>
   <div class="right" id="top-right">
-    <span class="chip elo">ELO: <span id="top-elo">—</span></span>
+    <span class="chip elo" id="top-tier-chip" title="Ранг">ELO: <span id="top-elo">—</span></span>
     <span class="chip coins">💰 <span id="top-coins">—</span></span>
     <span class="chip" id="top-gems-chip" style="background:rgba(167,139,250,0.15);border:1px solid #a78bfa;color:#c7b2ff;">💎 <span id="top-gems">0</span></span>
     <span id="top-nick" style="font-weight: 700; display: none;"></span>
@@ -1406,9 +1408,24 @@
           <div id="streak-block"><div style="color:var(--muted);font-size:13px;">Загрузка...</div></div>
         </div>
 
+        <div class="panel" id="seasonal-panel" style="display:none;">
+          <h3 id="seasonal-title">🎃 Событие</h3>
+          <div id="seasonal-block"></div>
+        </div>
+
         <div class="panel" id="event-panel" style="display:none;">
           <h3>Событие недели 🌟</h3>
           <div id="event-block"><div style="color:var(--muted);font-size:13px;">Загрузка...</div></div>
+        </div>
+
+        <div class="panel" id="ads-panel" style="display:none;">
+          <h3>💸 Посмотри рекламу — получи монеты</h3>
+          <div id="ads-block"><div style="color:var(--muted);font-size:13px;">Загрузка...</div></div>
+        </div>
+
+        <div class="panel" id="placement-panel" style="display:none;">
+          <h3>⭐ Placement-матчи</h3>
+          <div id="placement-block"><div style="color:var(--muted);font-size:13px;">Загрузка...</div></div>
         </div>
 
         <div class="panel" id="boost-panel-home" style="display:none;">
@@ -1607,6 +1624,15 @@
           <button id="clubs-create-btn" class="stake-btn" style="margin-top:10px;width:100%;padding:10px;" onclick="openCreateClubModal()">+ Создать клуб (2000 💰)</button>
         </div>
 
+        <div class="panel" id="club-chat-panel" style="display:none;">
+          <h3>💬 Клубный чат</h3>
+          <div id="club-chat-messages" style="max-height:240px;overflow-y:auto;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:8px;font-size:13px;"></div>
+          <div style="display:flex;gap:6px;">
+            <input id="club-chat-input" placeholder="Сообщение..." maxlength="500" style="flex:1;padding:8px;background:var(--panel2);border:1.5px solid var(--border);color:var(--text);border-radius:8px;" />
+            <button class="stake-btn" style="width:auto;padding:8px 14px;" onclick="sendClubMsg()">↑</button>
+          </div>
+        </div>
+
         <div class="panel">
           <h3>🏟️ Турнир недели</h3>
           <div id="tournament-block"><div style="color:var(--muted);font-size:13px;">Загрузка...</div></div>
@@ -1780,9 +1806,17 @@ let queueTimer = null;
 
 function $(id) { return document.getElementById(id); }
 
-// Haptic feedback (vibrate API)
+// Haptic feedback (vibrate API или TG HapticFeedback если в TG Mini App)
 function hap(kind) {
   try {
+    const tg = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback;
+    if (tg) {
+      if (kind === 'success') tg.notificationOccurred && tg.notificationOccurred('success');
+      else if (kind === 'error') tg.notificationOccurred && tg.notificationOccurred('error');
+      else if (kind === 'heavy') tg.impactOccurred && tg.impactOccurred('heavy');
+      else tg.impactOccurred && tg.impactOccurred('light');
+      return;
+    }
     if (!navigator.vibrate) return;
     if (kind === 'tap') navigator.vibrate(10);
     else if (kind === 'success') navigator.vibrate([10, 60, 20]);
@@ -1831,10 +1865,11 @@ function switchTab(tab, opts = {}) {
     loadCases(); loadShopThemes(); loadShopVfx(); loadShopAvatars(); loadReferralInfo(); loadGemShop();
   }
   if (tab === 'lb') {
-    loadClubs(); loadTournament();
+    loadClubs(); loadTournament(); loadClubChat(); startClubChatPolling();
   }
   if (tab === 'home') {
     loadBattlePass(); loadDailyChallenge(); loadStreak(); loadActivityFeed(); loadWeeklyEvent(); loadBoostInfo();
+    loadSeasonalEvent(); loadAdsStatus(); loadPlacementInfo();
   }
 }
 
@@ -1936,6 +1971,25 @@ async function switchLbCategory(cat) {
 }
 
 async function boot() {
+  // Если мы внутри Telegram Mini App — auto-auth через initData
+  const isTgApp = !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData);
+  if (isTgApp && !API.token()) {
+    try {
+      const tg = window.Telegram.WebApp;
+      tg.ready && tg.ready();
+      tg.expand && tg.expand();
+      const tgUser = tg.initDataUnsafe && tg.initDataUnsafe.user || null;
+      const r = await fetch('/api/auth/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ init_data: tg.initData, tg_user: tgUser }),
+      });
+      const data = await r.json();
+      if (data.ok && data.token) {
+        API.setToken(data.token);
+      }
+    } catch (e) { console.error('TG auth failed', e); }
+  }
   // Нет токена — создаём гостевой автоматически
   if (!API.token()) {
     try {
@@ -2126,8 +2180,17 @@ function renderTop() {
   $('top-nick').textContent = nick;
   $('top-coins').textContent = ME.coins ?? 0;
   const gemEl = $('top-gems'); if (gemEl) gemEl.textContent = ME.gems ?? 0;
-  $('top-elo').innerHTML = `${l.icon} ${Math.round(elo)}`;
-  $('top-elo').style.color = l.color;
+  // Tier + ELO
+  const t = ME.tier || null;
+  if (t) {
+    $('top-elo').innerHTML = `${t.icon} ${t.tier_ru}${t.division ? ' ' + t.division : ''}`;
+    $('top-elo').style.color = t.color;
+    const chip = $('top-tier-chip');
+    if (chip) chip.title = `${t.tier_ru} ${t.division} • ELO ${Math.round(elo)}`;
+  } else {
+    $('top-elo').innerHTML = `${l.icon} ${Math.round(elo)}`;
+    $('top-elo').style.color = l.color;
+  }
 
   const loginBtn = $('top-login-btn');
   const profBtn = $('top-profile-btn');
@@ -4688,6 +4751,175 @@ async function joinTournament() {
   } else {
     alert(r.msg || 'Ошибка');
   }
+}
+
+// ─── Seasonal event banner ───
+async function loadSeasonalEvent() {
+  try {
+    const r = await API.get('/api/seasonal_event');
+    const p = $('seasonal-panel'); const blk = $('seasonal-block'); const tt = $('seasonal-title');
+    if (!r.event) { if (p) p.style.display = 'none'; return; }
+    if (!p) return;
+    p.style.display = '';
+    const e = r.event;
+    if (tt) tt.textContent = e.name;
+    p.style.borderColor = e.banner_color;
+    blk.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <div style="color:var(--muted);font-size:13px;">Сезонное событие. Все матчи дают +${e.bonus_coins_pct}% coins.</div>
+      </div>
+    `;
+  } catch (e) {}
+}
+
+// ─── Ads ───
+async function loadAdsStatus() {
+  try {
+    const r = await API.get('/api/ads/status');
+    const p = $('ads-panel'); const blk = $('ads-block');
+    if (!r.authenticated || !p || !blk) return;
+    if (r.remaining <= 0) {
+      p.style.display = '';
+      blk.innerHTML = `<div style="color:var(--muted);font-size:13px;">Дневной лимит ${r.daily_limit} рекламы исчерпан. Возвращайся завтра.</div>`;
+      return;
+    }
+    p.style.display = '';
+    blk.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <div>
+          <div style="font-size:15px;font-weight:800;">+${r.reward_coins} 💰</div>
+          <div style="font-size:12px;color:var(--muted);">Осталось сегодня: ${r.remaining}/${r.daily_limit}</div>
+        </div>
+        <button class="stake-btn selected" style="padding:8px 16px;white-space:nowrap;" onclick="watchAd()">📺 Смотреть</button>
+      </div>
+    `;
+  } catch (e) {}
+}
+
+async function watchAd() {
+  // В продакшне: показываем AdSense/Yandex ad, после success — POST /api/ads/reward
+  // Сейчас stub: fake 3-сек таймер
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;z-index:9500;';
+  overlay.innerHTML = `
+    <div style="text-align:center;color:#fff;">
+      <div style="font-size:48px;">📺</div>
+      <div style="font-size:18px;margin-top:10px;">Реклама...</div>
+      <div id="ad-countdown" style="font-size:32px;font-weight:800;margin-top:10px;color:var(--accent2);">3</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  let left = 3;
+  const tick = setInterval(() => {
+    left--;
+    if (left <= 0) {
+      clearInterval(tick);
+      overlay.remove();
+      API.post('/api/ads/reward', {}).then(r => {
+        if (r.ok) {
+          hap('success');
+          ME.coins = r.new_coins; renderTop();
+          loadAdsStatus();
+          alert(`+${r.coins_awarded} 💰`);
+        } else alert(r.msg || 'Ошибка');
+      });
+    } else {
+      document.getElementById('ad-countdown').textContent = left;
+    }
+  }, 1000);
+}
+
+// ─── Placement matches ───
+async function loadPlacementInfo() {
+  try {
+    const r = await API.get('/api/ranked/me');
+    if (!r.authenticated) return;
+    const p = $('placement-panel'); const blk = $('placement-block');
+    if (!p || !blk) return;
+    if (r.placement_done) { p.style.display = 'none'; return; }
+    p.style.display = '';
+    blk.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:15px;font-weight:800;">Осталось ${r.placement_remaining} из 5</div>
+          <div style="font-size:12px;color:var(--muted);">Сыграй 5 матчей — определим твой начальный ранг.</div>
+        </div>
+        <div style="font-size:24px;font-weight:800;color:var(--accent2);">${r.total_matches}/5</div>
+      </div>
+    `;
+  } catch (e) {}
+}
+
+// ─── Club chat ───
+let _clubChatPollTimer = null;
+async function loadClubChat() {
+  try {
+    const r = await API.get('/api/clubs/chat');
+    const p = $('club-chat-panel');
+    if (!r.authenticated || !r.in_club) { if (p) p.style.display = 'none'; return; }
+    if (!p) return;
+    p.style.display = '';
+    const mel = $('club-chat-messages');
+    if (!mel) return;
+    mel.innerHTML = (r.messages || []).map(m => `
+      <div style="padding:4px 0;">
+        <span style="color:var(--accent);font-weight:700;">${escapeHtml(m.nickname || '?')}:</span>
+        <span>${escapeHtml(m.text || '')}</span>
+      </div>
+    `).join('') || '<div style="color:var(--muted);">Пусто — будь первым.</div>';
+    mel.scrollTop = mel.scrollHeight;
+  } catch (e) {}
+}
+
+async function sendClubMsg() {
+  const inp = $('club-chat-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  const r = await API.post('/api/clubs/chat/send', { text });
+  if (r.ok) { loadClubChat(); hap('tap'); }
+}
+
+function startClubChatPolling() {
+  if (_clubChatPollTimer) return;
+  _clubChatPollTimer = setInterval(() => {
+    if ($('screen-app').dataset.tab === 'lb' && $('club-chat-panel').style.display !== 'none') {
+      loadClubChat();
+    }
+  }, 4000);
+}
+
+// ─── Report player ───
+async function openReportPlayerModal(nickname, matchId) {
+  if (document.getElementById('rp-overlay')) return;
+  const o = document.createElement('div');
+  o.id = 'rp-overlay';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9500;padding:20px;';
+  o.innerHTML = `
+    <div style="background:var(--panel);border:1.5px solid var(--lose);border-radius:16px;padding:20px;max-width:360px;width:100%;">
+      <div style="font-size:18px;font-weight:800;margin-bottom:10px;">Пожаловаться на ${escapeHtml(nickname)}</div>
+      <select id="rp-reason" style="width:100%;padding:10px;background:var(--panel2);border:1.5px solid var(--border);color:var(--text);border-radius:8px;margin-bottom:10px;">
+        <option value="cheating">Читерство</option>
+        <option value="toxic">Токсичное поведение</option>
+        <option value="nick_inappropriate">Неподобающий ник</option>
+        <option value="afk">AFK / саботаж</option>
+        <option value="other">Другое</option>
+      </select>
+      <textarea id="rp-text" placeholder="Комментарий (не обязательно)" style="width:100%;padding:10px;background:var(--panel2);border:1.5px solid var(--border);color:var(--text);border-radius:8px;margin-bottom:10px;min-height:60px;resize:vertical;"></textarea>
+      <div style="display:flex;gap:8px;">
+        <button class="cancel-btn" style="flex:1;" onclick="document.getElementById('rp-overlay').remove()">Отмена</button>
+        <button class="stake-btn selected" style="flex:1;background:var(--lose);" onclick="submitReport('${escapeHtml(nickname)}', ${matchId || 'null'})">Отправить</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(o);
+}
+
+async function submitReport(nick, matchId) {
+  const reason = $('rp-reason').value + ': ' + ($('rp-text').value || '');
+  const r = await API.post('/api/report_player', { nickname: nick, match_id: matchId, reason });
+  document.getElementById('rp-overlay').remove();
+  alert(r.ok ? 'Жалоба отправлена' : (r.msg || 'Ошибка'));
 }
 
 function copyRefLink() {

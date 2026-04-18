@@ -32,6 +32,89 @@ share_router = APIRouter(tags=["reflex-share"])
 
 REFERRAL_BONUS = 100  # coins, обоим
 
+# ═══════════════════════════════════════════════════════════════
+#   RANKED TIERS
+# ═══════════════════════════════════════════════════════════════
+TIERS = [
+    # name, short, icon, color, min_elo
+    ("Bronze",    "Бронза",       "🥉", "#cd7f32",   0),
+    ("Silver",    "Серебро",      "🥈", "#c0c0c0",  900),
+    ("Gold",      "Золото",       "🥇", "#ffd700", 1100),
+    ("Platinum",  "Платина",      "💠", "#7dd3fc", 1300),
+    ("Diamond",   "Алмаз",        "💎", "#a78bfa", 1500),
+    ("Master",    "Мастер",        "👑", "#ff7a29", 1800),
+    ("Grandmaster","Грандмастер", "🌟", "#ff4081", 2100),
+]
+
+PLACEMENT_MATCHES = 5
+RANKED_SEASON_LENGTH_DAYS = 90
+SEASON_SOFT_RESET_PCT = 25
+
+
+def compute_tier(elo: float) -> dict:
+    """Возвращает {tier, tier_ru, icon, color, division(1-3), next_tier_elo, progress_pct}."""
+    elo = float(elo or 1000.0)
+    tier_idx = 0
+    for i, t in enumerate(TIERS):
+        if elo >= t[4]:
+            tier_idx = i
+    name, name_ru, icon, color, min_elo = TIERS[tier_idx]
+    # Дивизион (III → II → I) внутри тира
+    next_min = TIERS[tier_idx + 1][4] if tier_idx + 1 < len(TIERS) else min_elo + 300
+    span = max(1, next_min - min_elo)
+    progress = max(0.0, min(1.0, (elo - min_elo) / span))
+    # 3 дивизиона: progress 0-33% = III, 33-66% = II, 66-100% = I
+    if progress < 0.33:
+        div = "III"
+    elif progress < 0.66:
+        div = "II"
+    else:
+        div = "I"
+    if tier_idx == len(TIERS) - 1:
+        div = ""  # Grandmaster — без дивизионов
+    return {
+        "tier": name,
+        "tier_ru": name_ru,
+        "icon": icon,
+        "color": color,
+        "division": div,
+        "min_elo": min_elo,
+        "next_tier_elo": next_min,
+        "progress_pct": round(progress * 100, 1),
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+#   СЕЗОННЫЕ СОБЫТИЯ (хэллоуин, НГ, валентинки, лето)
+# ═══════════════════════════════════════════════════════════════
+
+def current_seasonal_event() -> Optional[dict]:
+    """Определяем событие по текущей дате."""
+    from datetime import datetime as _dt, timezone as _tz
+    now = _dt.now(_tz.utc)
+    m, d = now.month, now.day
+    if (m == 10 and d >= 20) or (m == 11 and d <= 3):
+        return {"id": "halloween", "name": "Хэллоуин 🎃",
+                "banner_color": "#ff7a29",
+                "bonus_coins_pct": 15,
+                "theme": "orange"}
+    if (m == 12 and d >= 20) or (m == 1 and d <= 10):
+        return {"id": "newyear", "name": "Новый Год ⛄",
+                "banner_color": "#7dd3fc",
+                "bonus_coins_pct": 20,
+                "theme": "winter"}
+    if m == 2 and 10 <= d <= 17:
+        return {"id": "valentines", "name": "День всех влюблённых 💖",
+                "banner_color": "#ff4081",
+                "bonus_coins_pct": 15,
+                "theme": "pink"}
+    if m == 7:
+        return {"id": "summer", "name": "Летний марафон ☀️",
+                "banner_color": "#ffd740",
+                "bonus_coins_pct": 10,
+                "theme": "beach"}
+    return None
+
 
 # Каталог дневных задач — каждое утро выбирается случайные 3
 DAILY_TASK_CATALOG = [
@@ -562,6 +645,7 @@ def me(authorization: Optional[str] = Header(None), db: Session = Depends(get_db
         "coins": player.coins or 0,
         "gems": player.gems or 0,
         "elo": round(player.reflex_elo or 1000.0, 1),
+        "tier": compute_tier(player.reflex_elo or 1000.0),
         "wins": player.reflex_wins or 0,
         "losses": player.reflex_losses or 0,
         "winrate": round((player.reflex_wins or 0) * 100 / max(1, total), 1) if total else 0,
@@ -2746,4 +2830,494 @@ def tournament_leaderboard(db: Session = Depends(get_db)):
              "player_id": p.id, "final_rank": s.final_rank}
             for i, (s, p) in enumerate(rows)
         ],
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+#   RANKED TIER endpoint
+# ═══════════════════════════════════════════════════════════════
+
+@router.get("/ranked/me")
+def ranked_me(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"authenticated": False}
+    payload = verify_token(authorization[7:])
+    if not payload: return {"authenticated": False}
+    pid = payload.get("player_id")
+    me = db.query(Player).filter(Player.id == pid).first()
+    if not me: return {"authenticated": False}
+    total = (me.reflex_wins or 0) + (me.reflex_losses or 0)
+    placement_done = total >= PLACEMENT_MATCHES
+    tier = compute_tier(me.reflex_elo or 1000)
+    # Категорийные тиры
+    cat_tiers = {
+        "reaction": compute_tier(me.elo_reaction or 1000),
+        "logic": compute_tier(me.elo_logic or 1000),
+        "memory": compute_tier(me.elo_memory or 1000),
+        "coordination": compute_tier(me.elo_coordination or 1000),
+        "trivia": compute_tier(me.elo_trivia or 1000),
+    }
+    return {
+        "authenticated": True,
+        "elo": round(me.reflex_elo or 1000, 1),
+        "tier": tier,
+        "categorical_tiers": cat_tiers,
+        "placement_done": placement_done,
+        "placement_remaining": max(0, PLACEMENT_MATCHES - total),
+        "total_matches": total,
+    }
+
+
+@router.get("/ranked/tiers")
+def ranked_tiers_list():
+    """Справочник тиров — для frontend."""
+    return {
+        "tiers": [
+            {"name": t[0], "name_ru": t[1], "icon": t[2], "color": t[3], "min_elo": t[4]}
+            for t in TIERS
+        ],
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+#   SEASONAL EVENT endpoint
+# ═══════════════════════════════════════════════════════════════
+
+@router.get("/seasonal_event")
+def seasonal_event_info():
+    ev = current_seasonal_event()
+    return {"event": ev}
+
+
+# ═══════════════════════════════════════════════════════════════
+#   ANTI-CHEAT: report, suspicious-pattern tracking
+# ═══════════════════════════════════════════════════════════════
+
+NICKNAME_BLACKLIST = {
+    "admin", "moderator", "root", "support", "anthropic", "claude",
+    "system", "bot", "null", "undefined", "official",
+}
+
+
+def nickname_is_safe(nick: str) -> bool:
+    if not nick: return False
+    n = nick.strip().lower()
+    if len(n) < 2 or len(n) > 24: return False
+    if n in NICKNAME_BLACKLIST: return False
+    # Простая фильтрация мата (минимум)
+    bad_stems = {"хуй", "бляд", "пизд", "ебан", "fuck", "shit", "nazi", "hitler"}
+    if any(b in n for b in bad_stems):
+        return False
+    return True
+
+
+@router.post("/report_player")
+def report_player(data: dict, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"ok": False}
+    payload = verify_token(authorization[7:])
+    if not payload: return {"ok": False}
+    pid = payload.get("player_id")
+    target_nick = (data or {}).get("nickname", "").strip()
+    match_id = (data or {}).get("match_id")
+    reason = (data or {}).get("reason", "")[:200]
+    if not target_nick: return {"ok": False, "msg": "Нет ника"}
+    target = db.query(Player).filter(Player.nickname == target_nick).first()
+    if not target: return {"ok": False, "msg": "Игрок не найден"}
+    try:
+        db.add(ReflexEvent(
+            player_id=pid,
+            event_type="report",
+            payload={"reported_player_id": target.id, "reported_nick": target_nick,
+                     "match_id": match_id, "reason": reason},
+        ))
+        db.commit()
+    except Exception: pass
+    return {"ok": True}
+
+
+@router.get("/flags/sus_count/{player_id}")
+def sus_count(player_id: int, db: Session = Depends(get_db)):
+    """Сколько раз жаловались на игрока."""
+    cnt = db.query(ReflexEvent).filter(
+        ReflexEvent.event_type == "report",
+    ).count()
+    return {"reports_total": cnt}
+
+
+# ═══════════════════════════════════════════════════════════════
+#   КЛУБНЫЕ ВОЙНЫ
+# ═══════════════════════════════════════════════════════════════
+
+@router.post("/clubs/challenge")
+def clubs_challenge(data: dict, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    """Клуб-капитан вызывает другой клуб на войну. Простая MVP-реализация:
+    создаётся запись о войне, оба клуба должны накидать победы в PvP в течение 24ч,
+    по истечении — побеждает тот клуб у кого больше побед за этот период."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"ok": False}
+    payload = verify_token(authorization[7:])
+    if not payload: return {"ok": False}
+    pid = payload.get("player_id")
+    mem = db.query(ReflexClubMember).filter(ReflexClubMember.player_id == pid).first()
+    if not mem or mem.role not in ("owner", "officer"):
+        return {"ok": False, "msg": "Только владелец может объявлять войну"}
+    target_tag = (data or {}).get("tag", "").strip().upper()
+    if not target_tag: return {"ok": False}
+    target_club = db.query(ReflexClub).filter(ReflexClub.tag == target_tag).first()
+    if not target_club or target_club.id == mem.club_id:
+        return {"ok": False, "msg": "Клуб не найден"}
+    # Упрощение: запись через ReflexEvent
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    ends_at = (_dt.now(_tz.utc) + _td(hours=24)).isoformat()
+    db.add(ReflexEvent(
+        player_id=pid, event_type="club_war_challenge",
+        payload={"attacker_club_id": mem.club_id, "defender_club_id": target_club.id,
+                 "ends_at": ends_at, "status": "active"},
+    ))
+    db.commit()
+    return {"ok": True, "ends_at": ends_at, "defender": {"tag": target_club.tag, "name": target_club.name}}
+
+
+@router.get("/clubs/wars")
+def clubs_wars(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    """Активные войны клуба игрока."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"authenticated": False}
+    payload = verify_token(authorization[7:])
+    if not payload: return {"authenticated": False}
+    pid = payload.get("player_id")
+    mem = db.query(ReflexClubMember).filter(ReflexClubMember.player_id == pid).first()
+    if not mem: return {"authenticated": True, "in_club": False}
+    rows = db.query(ReflexEvent).filter(
+        ReflexEvent.event_type == "club_war_challenge",
+    ).order_by(desc(ReflexEvent.created_at)).limit(20).all()
+    wars = []
+    for r in rows:
+        p = r.payload or {}
+        if p.get("attacker_club_id") == mem.club_id or p.get("defender_club_id") == mem.club_id:
+            wars.append({
+                "id": r.id,
+                "attacker_club_id": p.get("attacker_club_id"),
+                "defender_club_id": p.get("defender_club_id"),
+                "ends_at": p.get("ends_at"),
+                "status": p.get("status"),
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            })
+    return {"authenticated": True, "in_club": True, "wars": wars}
+
+
+# Простой club chat через ReflexEvent (message_type='club_chat')
+@router.post("/clubs/chat/send")
+def clubs_chat_send(data: dict, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"ok": False}
+    payload = verify_token(authorization[7:])
+    if not payload: return {"ok": False}
+    pid = payload.get("player_id")
+    mem = db.query(ReflexClubMember).filter(ReflexClubMember.player_id == pid).first()
+    if not mem: return {"ok": False, "msg": "Ты не в клубе"}
+    text = (data or {}).get("text", "").strip()[:500]
+    if not text: return {"ok": False}
+    me = db.query(Player).filter(Player.id == pid).first()
+    db.add(ReflexEvent(
+        player_id=pid, event_type="club_chat",
+        payload={"club_id": mem.club_id, "nickname": me.nickname if me else "?", "text": text},
+    ))
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/clubs/chat")
+def clubs_chat_get(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"authenticated": False}
+    payload = verify_token(authorization[7:])
+    if not payload: return {"authenticated": False}
+    pid = payload.get("player_id")
+    mem = db.query(ReflexClubMember).filter(ReflexClubMember.player_id == pid).first()
+    if not mem: return {"authenticated": True, "in_club": False}
+    rows = db.query(ReflexEvent).filter(
+        ReflexEvent.event_type == "club_chat",
+    ).order_by(desc(ReflexEvent.created_at)).limit(50).all()
+    msgs = []
+    for r in rows:
+        p = r.payload or {}
+        if p.get("club_id") == mem.club_id:
+            msgs.append({
+                "nickname": p.get("nickname"),
+                "text": p.get("text"),
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            })
+    msgs.reverse()
+    return {"authenticated": True, "in_club": True, "messages": msgs}
+
+
+# ═══════════════════════════════════════════════════════════════
+#   АДМИН-ПАНЕЛЬ: dashboard + player search
+# ═══════════════════════════════════════════════════════════════
+
+ADMIN_TOKEN = _os.environ.get("ADMIN_TOKEN", "")
+
+
+def _is_admin(authorization: Optional[str]) -> bool:
+    if not authorization: return False
+    if not authorization.startswith("Bearer "): return False
+    tok = authorization[7:]
+    if not ADMIN_TOKEN: return False
+    return tok == ADMIN_TOKEN
+
+
+@router.get("/admin/dashboard")
+def admin_dashboard(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not _is_admin(authorization):
+        return {"ok": False, "msg": "forbidden"}
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    now = _dt.now(_tz.utc)
+    d1 = now - _td(days=1)
+    d7 = now - _td(days=7)
+    d30 = now - _td(days=30)
+
+    total_players = db.query(Player).count()
+    guests = db.query(Player).filter(Player.is_guest == True).count()
+    total_matches = db.query(ReflexMatch).filter(ReflexMatch.status == "finished").count()
+
+    # DAU/WAU/MAU по событиям
+    dau = db.query(ReflexEvent.player_id).filter(
+        ReflexEvent.created_at >= d1, ReflexEvent.player_id.isnot(None)
+    ).distinct().count()
+    wau = db.query(ReflexEvent.player_id).filter(
+        ReflexEvent.created_at >= d7, ReflexEvent.player_id.isnot(None)
+    ).distinct().count()
+    mau = db.query(ReflexEvent.player_id).filter(
+        ReflexEvent.created_at >= d30, ReflexEvent.player_id.isnot(None)
+    ).distinct().count()
+
+    # Revenue (платежи completed)
+    rev = db.query(ReflexPayment).filter(ReflexPayment.status == "completed").all()
+    rev_stars = sum((p.amount_minor or 0) for p in rev if (p.currency or "XTR") == "XTR")
+    rev_payments = len(rev)
+
+    # Топ event-types за неделю
+    from sqlalchemy import func as _fn
+    top_ev = db.query(ReflexEvent.event_type, _fn.count(ReflexEvent.id)).filter(
+        ReflexEvent.created_at >= d7,
+    ).group_by(ReflexEvent.event_type).order_by(desc(_fn.count(ReflexEvent.id))).limit(15).all()
+
+    return {
+        "ok": True,
+        "total_players": total_players,
+        "guests": guests,
+        "registered": total_players - guests,
+        "total_matches": total_matches,
+        "dau": dau, "wau": wau, "mau": mau,
+        "revenue_stars_completed": rev_stars,
+        "revenue_payments_count": rev_payments,
+        "top_events_7d": [{"event": e, "count": c} for e, c in top_ev],
+    }
+
+
+@router.get("/admin/player/{query}")
+def admin_player_find(query: str, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not _is_admin(authorization):
+        return {"ok": False, "msg": "forbidden"}
+    pl = None
+    if query.isdigit():
+        pl = db.query(Player).filter(Player.id == int(query)).first()
+    if not pl:
+        pl = db.query(Player).filter(Player.nickname.ilike(f"%{query}%")).first()
+    if not pl: return {"ok": False, "msg": "not found"}
+    reports = db.query(ReflexEvent).filter(
+        ReflexEvent.event_type == "report",
+    ).all()
+    my_reports = [r for r in reports if (r.payload or {}).get("reported_player_id") == pl.id]
+    return {
+        "ok": True,
+        "player": {
+            "id": pl.id, "nickname": pl.nickname,
+            "coins": pl.coins or 0, "gems": pl.gems or 0, "xp": pl.xp or 0,
+            "elo": round(pl.reflex_elo or 1000, 1),
+            "wins": pl.reflex_wins or 0, "losses": pl.reflex_losses or 0,
+            "is_guest": bool(pl.is_guest),
+            "created_at": pl.created_at.isoformat() if pl.created_at else None,
+        },
+        "tier": compute_tier(pl.reflex_elo or 1000),
+        "reports_against": len(my_reports),
+    }
+
+
+@router.post("/admin/broadcast")
+def admin_broadcast(data: dict, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not _is_admin(authorization):
+        return {"ok": False, "msg": "forbidden"}
+    text = (data or {}).get("text", "")
+    if not text: return {"ok": False}
+    # Логируем — WS push / email уйдёт позже через background job
+    db.add(ReflexEvent(player_id=None, event_type="admin_broadcast",
+                       payload={"text": text, "queued_at": datetime.utcnow().isoformat()}))
+    db.commit()
+    return {"ok": True, "msg": "queued"}
+
+
+# ═══════════════════════════════════════════════════════════════
+#   MATCH REPLAY
+# ═══════════════════════════════════════════════════════════════
+
+@router.get("/replay/{match_id}")
+def replay_match(match_id: int, db: Session = Depends(get_db)):
+    m = db.query(ReflexMatch).filter(ReflexMatch.id == match_id).first()
+    if not m or m.status != "finished":
+        return {"ok": False, "msg": "не найден или не завершён"}
+    p1 = db.query(Player).filter(Player.id == m.p1_id).first()
+    p2 = db.query(Player).filter(Player.id == m.p2_id).first()
+    return {
+        "ok": True,
+        "match": {
+            "id": m.id,
+            "p1": {"id": m.p1_id, "nickname": p1.nickname if p1 else "?"},
+            "p2": {"id": m.p2_id, "nickname": p2.nickname if p2 else "?"},
+            "rounds_p1": m.rounds_p1 or 0,
+            "rounds_p2": m.rounds_p2 or 0,
+            "winner_id": m.winner_id,
+            "rounds_log": m.rounds_log or [],
+            "elo_change_p1": m.elo_change_p1 or 0,
+            "elo_change_p2": m.elo_change_p2 or 0,
+            "started_at": m.started_at.isoformat() if m.started_at else None,
+            "finished_at": m.finished_at.isoformat() if m.finished_at else None,
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+#   ADS: watch-ad for reward (stub, до интеграции AdSense)
+# ═══════════════════════════════════════════════════════════════
+
+AD_DAILY_LIMIT = 5
+AD_REWARD_COINS = 30
+
+
+@router.get("/ads/status")
+def ads_status(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"authenticated": False}
+    payload = verify_token(authorization[7:])
+    if not payload: return {"authenticated": False}
+    pid = payload.get("player_id")
+    today = _today_str()
+    viewed = db.query(ReflexEvent).filter(
+        ReflexEvent.player_id == pid,
+        ReflexEvent.event_type == "ad_reward_granted",
+    ).all()
+    today_count = sum(1 for e in viewed if e.created_at and e.created_at.strftime("%Y-%m-%d") == today)
+    return {
+        "authenticated": True,
+        "views_today": today_count,
+        "remaining": max(0, AD_DAILY_LIMIT - today_count),
+        "daily_limit": AD_DAILY_LIMIT,
+        "reward_coins": AD_REWARD_COINS,
+    }
+
+
+@router.post("/ads/reward")
+def ads_reward(data: dict, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    """Вызывается после успешного просмотра рекламы.
+    Клиент должен подтвердить ad_token (когда будет SDK) — пока stub."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"ok": False}
+    payload = verify_token(authorization[7:])
+    if not payload: return {"ok": False}
+    pid = payload.get("player_id")
+    today = _today_str()
+    from datetime import datetime as _dt, timezone as _tz
+    # Считаем сколько сегодня
+    viewed = db.query(ReflexEvent).filter(
+        ReflexEvent.player_id == pid,
+        ReflexEvent.event_type == "ad_reward_granted",
+    ).all()
+    today_count = sum(1 for e in viewed if e.created_at and e.created_at.strftime("%Y-%m-%d") == today)
+    if today_count >= AD_DAILY_LIMIT:
+        return {"ok": False, "msg": "Дневной лимит исчерпан"}
+    me = db.query(Player).filter(Player.id == pid).with_for_update().first()
+    if not me: return {"ok": False}
+    me.coins = (me.coins or 0) + AD_REWARD_COINS
+    db.add(ReflexEvent(player_id=pid, event_type="ad_reward_granted",
+                       payload={"coins": AD_REWARD_COINS, "views_today": today_count + 1}))
+    db.commit()
+    return {"ok": True, "coins_awarded": AD_REWARD_COINS, "new_coins": me.coins,
+            "remaining": max(0, AD_DAILY_LIMIT - today_count - 1)}
+
+
+# ═══════════════════════════════════════════════════════════════
+#   TELEGRAM MINI APP: auto-auth через initData
+# ═══════════════════════════════════════════════════════════════
+
+@router.post("/auth/telegram")
+def auth_telegram(data: dict, db: Session = Depends(get_db)):
+    """Авторизация через Telegram Mini App initData.
+    initData — строка от Telegram.WebApp.initData, содержит подпись.
+    Упрощённая проверка: hash-подпись HMAC-SHA256 с secret = HMAC-SHA256(bot_token, "WebAppData").
+    """
+    init_data = (data or {}).get("init_data", "")
+    if not init_data:
+        return {"ok": False, "msg": "Нет initData"}
+    if not TG_BOT_TOKEN:
+        # Dev-режим: создаём гостя с ником из tg_user
+        tg_user = (data or {}).get("tg_user", {}) or {}
+        tg_id = tg_user.get("id")
+        tg_nick = tg_user.get("username") or tg_user.get("first_name") or f"TG_{tg_id or _rnd.randint(1000, 999999)}"
+        if not tg_id:
+            return {"ok": False, "msg": "Dev: нужно tg_user.id"}
+        return _upsert_tg_player(db, tg_id, tg_nick, first_name=tg_user.get("first_name", ""))
+    # Валидация подписи
+    try:
+        import urllib.parse, hmac, hashlib, json as _json
+        parsed = dict(urllib.parse.parse_qsl(init_data, keep_blank_values=True))
+        hash_val = parsed.pop("hash", "")
+        data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
+        secret = hmac.new(b"WebAppData", TG_BOT_TOKEN.encode("utf-8"), hashlib.sha256).digest()
+        calc = hmac.new(secret, data_check_string.encode("utf-8"), hashlib.sha256).hexdigest()
+        if calc != hash_val:
+            return {"ok": False, "msg": "Неверная подпись"}
+        tg_user = _json.loads(parsed.get("user", "{}"))
+        tg_id = tg_user.get("id")
+        tg_nick = tg_user.get("username") or tg_user.get("first_name") or f"TG_{tg_id}"
+        if not tg_id:
+            return {"ok": False, "msg": "Нет user.id"}
+        return _upsert_tg_player(db, tg_id, tg_nick, first_name=tg_user.get("first_name", ""))
+    except Exception as e:
+        return {"ok": False, "msg": f"error: {str(e)[:200]}"}
+
+
+def _upsert_tg_player(db: Session, tg_id: int, tg_nick: str, first_name: str = ""):
+    from core.auth import create_access_token
+    # Ищем по ач-коду tg_id
+    existing = db.query(ReflexAchievement).filter(
+        ReflexAchievement.code == f"tg_id_{tg_id}",
+    ).first()
+    pl = None
+    if existing:
+        pl = db.query(Player).filter(Player.id == existing.player_id).first()
+    if not pl:
+        # Генерируем уникальный ник
+        base_nick = tg_nick[:24]
+        if not nickname_is_safe(base_nick):
+            base_nick = f"TG_{tg_id}"
+        nick = base_nick
+        i = 0
+        while db.query(Player).filter(Player.nickname == nick).first():
+            i += 1
+            nick = f"{base_nick}_{i}"
+            if i > 99:
+                nick = f"TG_{tg_id}_{_rnd.randint(1000,9999)}"
+                break
+        pl = Player(nickname=nick, coins=50, xp=0, is_guest=False)
+        db.add(pl); db.flush()
+        db.add(ReflexAchievement(player_id=pl.id, code=f"tg_id_{tg_id}"))
+        db.commit()
+    token = create_access_token({"player_id": pl.id, "nickname": pl.nickname})
+    return {
+        "ok": True,
+        "token": token,
+        "player_id": pl.id,
+        "nickname": pl.nickname,
     }
