@@ -1819,22 +1819,26 @@
       align-self: flex-start;
     }
 
-    /* Content внутри hv2-card */
-    body:not([data-style]) .hv2-card .hv2-icon {
+    /* Content внутри hv2-card — селектор без body:not чтобы размер ВСЕГДА применялся */
+    .hv2-icon {
       width: 56px; height: 56px;
       border-radius: 16px;
       display: flex; align-items: center; justify-content: center;
       background: rgba(255,255,255,0.06);
       border: 1px solid rgba(255,255,255,0.08);
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+      flex-shrink: 0;
     }
-    body:not([data-style]) .hv2-card .hv2-icon svg { width: 32px; height: 32px; }
-    body:not([data-style]) .hv2-card.hv2-play .hv2-icon {
+    .hv2-icon svg { width: 32px !important; height: 32px !important; display: block; }
+    .hv2-play .hv2-icon {
       width: 72px; height: 72px; border-radius: 20px;
       background: rgba(255,255,255,0.15);
       border-color: rgba(255,255,255,0.25);
     }
-    body:not([data-style]) .hv2-card.hv2-play .hv2-icon svg { width: 44px; height: 44px; }
+    .hv2-play .hv2-icon svg { width: 44px !important; height: 44px !important; }
+    /* Guard: даже если grid не сработал, карточки имеют max-width */
+    .hv2-card { max-width: 100%; }
+    .hv2-grid { max-width: 640px; margin: 0 auto; padding: 0 14px; }
     body:not([data-style]) .hv2-card .hv2-title {
       font-family: var(--font-display);
       font-weight: 800; font-size: 22px;
@@ -3427,8 +3431,17 @@ function applyTheme(t) {
   document.documentElement.style.setProperty('--accent2', t.accent2);
   // Style-preset (retro/cyber/duo/brutal) если есть — кладём на body
   const style = t.style || '';
-  document.body.dataset.style = style;
+  if (style) {
+    document.body.dataset.style = style;
+  } else {
+    // КРИТИЧНО: removeAttribute, не пустая строка. Пустая строка ломает
+    // селектор body:not([data-style]) и всё оформление.
+    document.body.removeAttribute('data-style');
+  }
   try { localStorage.setItem('ra_active_theme', style); } catch (_) {}
+  // Перерисовать home-bento (может не было style, а теперь есть, или наоборот)
+  try { if (typeof renderHomeBento === 'function') renderHomeBento(); } catch (_) {}
+  try { if (typeof renderHomeStats === 'function') renderHomeStats(); } catch (_) {}
 }
 
 async function loadShopThemes() {
