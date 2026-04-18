@@ -1083,7 +1083,13 @@ class ReflexRoom:
                 except Exception:
                     continue
                 mt = msg.get("type")
-                if mt == "result":
+                if mt == "ping":
+                    # Heartbeat от клиента — отвечаем pong, чтобы фронт знал что мы живы
+                    try:
+                        await self.ws[role].send_text(_json.dumps({"type": "pong"}))
+                    except Exception:
+                        pass
+                elif mt == "result":
                     await self.handle_result(role, msg.get("score", 0), msg.get("elapsed_ms", 0))
                 elif mt == "emote":
                     code = str(msg.get("code", ""))[:20]

@@ -1688,6 +1688,7 @@
       <div class="game-area" id="game-area"></div>
       <button class="emote-btn" id="emote-btn" onclick="toggleEmotePanel()" title="Эмоуты">😀</button>
       <div class="emote-panel hidden" id="emote-panel"></div>
+      <button id="manual-reconnect-btn" onclick="forceReconnect()" style="display:none;position:fixed;bottom:calc(env(safe-area-inset-bottom,0) + 14px);left:50%;transform:translateX(-50%);background:linear-gradient(90deg,#ff7a29,#ffb86b);color:#1a1205;border:none;padding:12px 22px;border-radius:24px;font-weight:800;font-size:14px;cursor:pointer;z-index:5000;box-shadow:0 4px 14px rgba(0,0,0,0.4);">🔄 Переподключиться</button>
     </div>
   </div>
 
@@ -2057,10 +2058,12 @@ function tryRejoin() {
   if (_rejoinInFlight) return;
   if (!API.token()) return;
   _rejoinInFlight = true;
+  // Safety-net: сбросить флаг через 15с если onerror/onclose не отработают
+  const safetyTimer = setTimeout(() => { _rejoinInFlight = false; }, 15000);
   const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
   const url = proto + location.host + '/ws/queue?token=' + encodeURIComponent(API.token());
   const probe = new WebSocket(url);
-  const cleanup = () => { _rejoinInFlight = false; };
+  const cleanup = () => { _rejoinInFlight = false; clearTimeout(safetyTimer); };
   probe.onopen = () => {
     probe.send(JSON.stringify({ type: 'rejoin' }));
   };
@@ -2140,28 +2143,99 @@ function handleWsCloseMaybeRejoin() {
 
 // ─── Auto-rejoin при возврате в приложение ───
 let _lastVisibilityCheck = 0;
+let _lastServerMsgAt = 0;  // timestamp последнего сообщения от сервера (heartbeat-watchdog)
+
+function markServerAlive() { _lastServerMsgAt = Date.now(); }
+
+// Перехватываем создание WebSocket, чтобы markServerAlive при onopen
+(function patchWs() {
+  const Orig = window.WebSocket;
+  window.WebSocket = function(url, protocols) {
+    const w = protocols ? new Orig(url, protocols) : new Orig(url);
+    const origSetOpen = () => { markServerAlive(); };
+    w.addEventListener('open', origSetOpen);
+    w.addEventListener('message', () => markServerAlive());
+    return w;
+  };
+  window.WebSocket.prototype = Orig.prototype;
+  window.WebSocket.OPEN = Orig.OPEN;
+  window.WebSocket.CLOSED = Orig.CLOSED;
+  window.WebSocket.CLOSING = Orig.CLOSING;
+  window.WebSocket.CONNECTING = Orig.CONNECTING;
+})();
+
+function wsIsStale() {
+  if (!ws) return true;
+  if (ws.readyState !== WebSocket.OPEN && ws.readyState !== WebSocket.CONNECTING) return true;
+  // Если >25с нет сообщений от сервера во время активного матча — считаем stale
+  if (_lastServerMsgAt && Date.now() - _lastServerMsgAt > 25000) return true;
+  return false;
+}
+
+function forceCloseWs() {
+  if (!ws) return;
+  try { ws.onmessage = null; ws.onclose = null; ws.onerror = null; } catch (_) {}
+  try { ws.close(); } catch (_) {}
+  ws = null;
+}
+
+function showManualReconnectBtn(show) {
+  const b = $('manual-reconnect-btn');
+  if (b) b.style.display = show ? '' : 'none';
+}
+
+function forceReconnect() {
+  forceCloseWs();
+  showManualReconnectBtn(false);
+  _rejoinInFlight = false;  // сбрасываем флаг
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:var(--accent);color:#1a1205;padding:10px 20px;border-radius:20px;font-weight:700;z-index:9000;';
+  toast.textContent = '🔄 Переподключаюсь...';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
+  tryRejoin();
+}
+
 function maybeRejoinOnVisible() {
   const now = Date.now();
   if (now - _lastVisibilityCheck < 1000) return;  // дебаунс
   _lastVisibilityCheck = now;
-  // Реконнект только если мы залогинены И ws закрыт/отсутствует
   if (!ME) return;
-  const wsOk = ws && ws.readyState === WebSocket.OPEN;
-  if (wsOk) return;
-  // Не во время активного поиска очереди (findMatch) — там отдельная логика
-  if ($('screen-queue').classList.contains('active')) {
-    // Если был матч — попробуем подцепиться
+  // Агрессивный подход: если мы в матче и ws подозрителен — force-close + rejoin
+  const inMatch = $('screen-match').classList.contains('active') && !matchIsFinished();
+  if (inMatch && wsIsStale()) {
+    forceCloseWs();
     tryRejoin();
     return;
   }
-  // В матче, но ws закрыт — срочный реконнект
-  if ($('screen-match').classList.contains('active') && !matchIsFinished()) {
-    tryRejoin();
-    return;
-  }
-  // В лобби — на всякий случай проверим не висит ли матч (внезапное ручное восстановление)
+  if (ws && ws.readyState === WebSocket.OPEN) return;
+  if (inMatch) { tryRejoin(); return; }
+  if ($('screen-queue').classList.contains('active')) { tryRejoin(); return; }
   tryRejoin();
 }
+
+// Heartbeat: каждые 10с шлём ping чтоб сервер не закрыл по idle + фиксим _lastServerMsgAt
+setInterval(() => {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    try { ws.send(JSON.stringify({ type: 'ping' })); } catch (_) {}
+  }
+}, 10000);
+
+// Watchdog: каждые 10с проверяем "живость" WS на match screen
+setInterval(() => {
+  const inMatch = $('screen-match') && $('screen-match').classList.contains('active') && !matchIsFinished();
+  if (!inMatch) { showManualReconnectBtn(false); return; }
+  if (wsIsStale()) {
+    // Показываем ручную кнопку и пробуем авто-рекконект
+    showManualReconnectBtn(true);
+    if (!_rejoinInFlight) {
+      forceCloseWs();
+      tryRejoin();
+    }
+  } else {
+    showManualReconnectBtn(false);
+  }
+}, 10000);
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
@@ -3353,31 +3427,53 @@ function startCountDotsGame() {
   const t0 = performance.now();
   let correct = 0, wrong = 0, finished = false, rafId = null, lock = false;
   const field = $('cd-field');
+  let hideTimerId = null;  // таймер скрытия точек — должен отменяться при новом раунде
+  let nextTimerId = null;  // таймер запуска следующего раунда
 
   function next() {
     if (finished) return;
+    // Отменяем все старые таймеры от предыдущего раунда
+    if (hideTimerId) { clearTimeout(hideTimerId); hideTimerId = null; }
+    if (nextTimerId) { clearTimeout(nextTimerId); nextTimerId = null; }
     lock = true;
     // Случайное число точек 5..20
     const count = 5 + Math.floor(Math.random() * 16);
-    field.innerHTML = '';
+    // Очищаем опции сразу, чтоб игрок не видел кнопки пока считает
+    const optsEl = $('cd-opts');
+    if (optsEl) optsEl.innerHTML = '';
+    // Рисуем точки + мини-countdown сверху поля
+    field.innerHTML = '<div id="cd-countdown" style="position:absolute;top:4px;right:6px;font-size:14px;font-weight:800;color:var(--accent2);z-index:5;pointer-events:none;">2.0</div>';
     for (let i = 0; i < count; i++) {
       const d = document.createElement('div');
-      d.style.cssText = `position:absolute;width:12px;height:12px;border-radius:50%;background:var(--accent);left:${8 + Math.random() * 230}px;top:${8 + Math.random() * 150}px;`;
+      d.style.cssText = `position:absolute;width:14px;height:14px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);left:${10 + Math.random() * 226}px;top:${10 + Math.random() * 146}px;`;
       field.appendChild(d);
     }
-    // Через 1.5 сек прячем и даём варианты
-    setTimeout(() => {
+    // Визуальный countdown
+    const showStartMs = performance.now();
+    const SHOW_MS = 2000;
+    function tickCd() {
       if (finished) return;
-      field.innerHTML = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:48px;color:var(--muted);">?</div>`;
+      const left = SHOW_MS - (performance.now() - showStartMs);
+      const el = $('cd-countdown');
+      if (!el) return;
+      if (left <= 0) return;
+      el.textContent = (left / 1000).toFixed(1);
+      requestAnimationFrame(tickCd);
+    }
+    requestAnimationFrame(tickCd);
+    // Через 2 сек прячем точки и даём варианты
+    hideTimerId = setTimeout(() => {
+      hideTimerId = null;
+      if (finished) return;
+      field.innerHTML = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:42px;color:var(--muted);">Сколько?</div>`;
       const opts = new Set([count]);
       while (opts.size < 4) {
         const d = count + (Math.floor(Math.random() * 7) - 3);
         if (d > 0 && d !== count) opts.add(d);
       }
       const shuffled = [...opts].sort(() => Math.random() - 0.5);
-      const optsEl = $('cd-opts');
       try { document.activeElement && document.activeElement.blur && document.activeElement.blur(); } catch (_) {}
-      optsEl.innerHTML = '';
+      if (optsEl) optsEl.innerHTML = '';
       shuffled.forEach(v => {
         const btn = document.createElement('button');
         btn.className = 'math-opt';
@@ -3396,11 +3492,12 @@ function startCountDotsGame() {
               if (parseInt(b.textContent) === count) b.classList.add('correct');
             });
           }
-          setTimeout(() => { if (!finished) next(); }, 400);
+          if (nextTimerId) clearTimeout(nextTimerId);
+          nextTimerId = setTimeout(() => { nextTimerId = null; if (!finished) next(); }, 500);
         });
         optsEl.appendChild(btn);
       });
-    }, 1500);
+    }, 2000);
   }
 
   function loop(now) {
@@ -3419,7 +3516,12 @@ function startCountDotsGame() {
   }
   next();
   rafId = requestAnimationFrame(loop);
-  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
+  return { cleanup: () => {
+    finished = true;
+    cancelAnimationFrame(rafId);
+    if (hideTimerId) clearTimeout(hideTimerId);
+    if (nextTimerId) clearTimeout(nextTimerId);
+  } };
 }
 
 // ─── Саймон говорит ───
@@ -5303,9 +5405,13 @@ let MATCH = null;  // { role, opponent, you, stake, games_preview }
 let currentGame = null;   // instance
 
 function handleServerMsg(msg) {
+  markServerAlive();  // heartbeat: отмечаем что сервер шлёт сообщения
   switch (msg.type) {
     case 'queued':
       // Сервер подтвердил очередь — ничего не делаем
+      break;
+    case 'pong':
+      // Ответ на наш ping — ws живой
       break;
     case 'matched':
       onMatched(msg);
