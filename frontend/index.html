@@ -1404,6 +1404,16 @@
           <div id="streak-block"><div style="color:var(--muted);font-size:13px;">Загрузка...</div></div>
         </div>
 
+        <div class="panel" id="event-panel" style="display:none;">
+          <h3>Событие недели 🌟</h3>
+          <div id="event-block"><div style="color:var(--muted);font-size:13px;">Загрузка...</div></div>
+        </div>
+
+        <div class="panel" id="boost-panel-home" style="display:none;">
+          <h3>Мои бусты ⚡ <span id="boost-total-home" style="color:var(--accent2);font-weight:400;font-size:13px;"></span></h3>
+          <div id="boost-block-home"><div style="color:var(--muted);font-size:13px;">Загрузка...</div></div>
+        </div>
+
         <div class="panel" id="bp-panel">
           <h3>Battle Pass ⚔️</h3>
           <div id="bp-summary"><div style="color:var(--muted);font-size:13px;">Загрузка...</div></div>
@@ -1476,6 +1486,12 @@
         <div class="panel">
           <h3>Достижения</h3>
           <div id="ach-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Титулы 🎗️ <span id="title-counter" style="color:var(--accent2);font-weight:400;font-size:12px;"></span></h3>
+          <div style="color:var(--muted);font-size:12px;margin-bottom:10px;">Выберите активный титул — он виден другим в матчах и профиле.</div>
+          <div id="titles-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;"></div>
         </div>
 
         <div class="panel">
@@ -1781,13 +1797,13 @@ function switchTab(tab, opts = {}) {
   // Ленивая загрузка того что может устареть
   if (tab === 'lb') loadLeaderboard();
   if (tab === 'profile') {
-    loadCategoryElo(); loadDailyTasks(); loadCollection(); loadAchievements(); loadFriends();
+    loadCategoryElo(); loadDailyTasks(); loadCollection(); loadAchievements(); loadFriends(); loadTitles();
   }
   if (tab === 'shop') {
     loadCases(); loadShopThemes(); loadShopVfx(); loadShopAvatars(); loadReferralInfo();
   }
   if (tab === 'home') {
-    loadBattlePass(); loadDailyChallenge(); loadStreak(); loadActivityFeed();
+    loadBattlePass(); loadDailyChallenge(); loadStreak(); loadActivityFeed(); loadWeeklyEvent(); loadBoostInfo();
   }
 }
 
@@ -1947,6 +1963,8 @@ async function boot() {
   tryRejoin();
   // Онбординг для новых
   showOnboardingIfNeeded();
+  // Бонус возвращения через 3+ дней отсутствия
+  setTimeout(() => checkReturnBonus(), 600);
 }
 
 let _rejoinInFlight = false;
@@ -3386,6 +3404,131 @@ async function claimStreak() {
   } else {
     alert(r.msg || 'Ошибка');
   }
+}
+
+// ─── Weekly event banner ───
+async function loadWeeklyEvent() {
+  try {
+    const ev = await API.get('/api/weekly_event');
+    const panel = $('event-panel'); const blk = $('event-block');
+    if (!panel || !blk || !ev || !ev.category) return;
+    panel.style.display = '';
+    const icons = { reaction:'🔴', logic:'🟡', memory:'🟢', coordination:'🔵', trivia:'🟣' };
+    blk.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <div>
+          <div style="font-size:20px;font-weight:800;">${icons[ev.category]||'✨'} ${escapeHtml(ev.category_name || ev.category)}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">+${ev.bonus_pct}% к монетам за матчи этой категории</div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);text-align:right;">Неделя ${ev.week_num}</div>
+      </div>
+    `;
+  } catch (e) {}
+}
+
+// ─── Мои бусты ───
+async function loadBoostInfo() {
+  try {
+    const r = await API.get('/api/boost');
+    if (!r.authenticated) return;
+    const panel = $('boost-panel-home');
+    const blk = $('boost-block-home');
+    const totalEl = $('boost-total-home');
+    if (!panel || !blk) return;
+    const b = r.boost || {};
+    if ((b.total_pct || 0) === 0) { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    if (totalEl) totalEl.textContent = `общий бонус +${b.total_pct}%`;
+    const rows = [];
+    if (b.item && b.item.boost_pct) {
+      rows.push(`<div style="display:flex;justify-content:space-between;font-size:13px;"><span>🧤 ${escapeHtml(b.item.name)}</span><span style="color:var(--accent2);font-weight:700;">+${b.item.boost_pct}%</span></div>`);
+    }
+    if (b.streak && b.streak.pct > 0) {
+      rows.push(`<div style="display:flex;justify-content:space-between;font-size:13px;"><span>🔥 Стрик ${b.streak.days} дн.</span><span style="color:var(--accent2);font-weight:700;">+${b.streak.pct}%</span></div>`);
+    }
+    if (b.set && b.set.pct > 0) {
+      rows.push(`<div style="display:flex;justify-content:space-between;font-size:13px;"><span>🎒 Сеты (${b.set.categories_active.length})</span><span style="color:var(--accent2);font-weight:700;">+${b.set.pct}%</span></div>`);
+    }
+    if (b.event && b.event.active) {
+      rows.push(`<div style="display:flex;justify-content:space-between;font-size:13px;"><span>🌟 Событие: ${escapeHtml(b.event.category_name)}</span><span style="color:var(--accent2);font-weight:700;">+${b.event.pct}%</span></div>`);
+    }
+    if (b.raw_total_pct > b.total_pct) {
+      rows.push(`<div style="color:var(--muted);font-size:11px;margin-top:6px;">Кап ${r.cap_pct}% — часть буста съедена</div>`);
+    }
+    if (!rows.length) {
+      rows.push(`<div style="color:var(--muted);font-size:13px;">Нет активных бустов. Надень предмет из коллекции, играй стрик, лови событие недели.</div>`);
+    }
+    blk.innerHTML = rows.join('');
+  } catch (e) {}
+}
+
+// ─── Титулы ───
+async function loadTitles() {
+  try {
+    const r = await API.get('/api/titles');
+    if (!r.authenticated) return;
+    const lst = $('titles-list'); const cnt = $('title-counter');
+    if (!lst) return;
+    const ownedN = r.titles.filter(t => t.owned).length;
+    if (cnt) cnt.textContent = `${ownedN}/${r.titles.length}`;
+    lst.innerHTML = r.titles.map(t => {
+      const locked = !t.owned;
+      const active = t.active;
+      const click = locked ? '' : `onclick="equipTitle('${t.id}')"`;
+      return `
+        <div ${click} style="background:var(--panel2);border:1.5px solid ${active?'var(--accent)':'var(--border)'};border-radius:10px;padding:10px;cursor:${locked?'not-allowed':'pointer'};opacity:${locked?0.4:1};">
+          <div style="font-size:20px;text-align:center;">${t.icon}</div>
+          <div style="font-size:12px;font-weight:700;text-align:center;margin-top:4px;">${escapeHtml(t.name)}</div>
+          ${active?'<div style="text-align:center;color:var(--accent);font-size:11px;margin-top:4px;">✓ надет</div>':''}
+          ${locked?'<div style="text-align:center;color:var(--muted);font-size:11px;margin-top:4px;">🔒 закрыт</div>':''}
+        </div>
+      `;
+    }).join('') + (r.active ? `<div style="grid-column:1/-1;text-align:center;margin-top:6px;"><button onclick="equipTitle('')" style="background:transparent;color:var(--muted);border:1px solid var(--border);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">Снять титул</button></div>` : '');
+  } catch (e) {}
+}
+
+async function equipTitle(tid) {
+  const r = await API.post('/api/titles/equip', { title_id: tid });
+  if (r.ok) { hap('tap'); loadTitles(); }
+  else alert(r.msg || 'Ошибка');
+}
+
+// ─── Return bonus: при заходе через 3+ дней — модалка ───
+async function checkReturnBonus() {
+  try {
+    const r = await API.get('/api/return_bonus');
+    if (!r.authenticated || !r.available) return;
+    showReturnBonusModal(r);
+  } catch (e) {}
+}
+
+function showReturnBonusModal(info) {
+  if (document.getElementById('return-bonus-overlay')) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'return-bonus-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9500;padding:20px;padding-top:calc(env(safe-area-inset-top,0) + 20px);';
+  overlay.innerHTML = `
+    <div style="background:var(--panel);border:1.5px solid var(--accent);border-radius:18px;padding:26px;max-width:380px;width:100%;text-align:center;">
+      <div style="font-size:52px;">🎁</div>
+      <div style="font-size:20px;font-weight:800;margin:10px 0 6px;">С возвращением!</div>
+      <div style="color:var(--muted);font-size:13px;margin-bottom:16px;">Тебя не было ${info.days_away} дн. Лови бонус возвращения.</div>
+      <div style="background:var(--panel2);border-radius:12px;padding:14px;margin-bottom:14px;">
+        <div style="font-size:32px;font-weight:800;color:var(--accent2);">+${info.reward_coins} 💰</div>
+      </div>
+      <button id="return-bonus-claim-btn" style="background:linear-gradient(90deg,var(--accent),var(--accent2));color:#1a1205;border:none;padding:14px 28px;border-radius:12px;font-weight:800;cursor:pointer;width:100%;">Забрать награду</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  $('return-bonus-claim-btn').onclick = async () => {
+    const r = await API.post('/api/return_bonus/claim', {});
+    if (r.ok) {
+      hap('success');
+      ME.coins = r.new_coins; renderTop();
+      overlay.remove();
+    } else {
+      alert(r.msg || 'Ошибка');
+    }
+  };
 }
 
 // ─── Activity feed (последние матчи на платформе) ───

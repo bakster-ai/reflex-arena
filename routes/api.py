@@ -1890,3 +1890,368 @@ def push_unsubscribe(data: dict, authorization: Optional[str] = Header(None), db
     ).delete(synchronize_session=False)
     db.commit()
     return {"ok": True}
+
+
+# ═══════════════════════════════════════════════════════════════
+#   БУСТЫ: итемы + стрик + события + сеты
+# ═══════════════════════════════════════════════════════════════
+
+# Кап общего буста чтобы не было pay-to-win
+MAX_BOOST_PCT = 50
+
+# Категория недели: определяется детерминированно по номеру ISO-недели
+WEEKLY_EVENT_CATEGORIES = ["reaction", "logic", "memory", "coordination", "trivia"]
+WEEKLY_EVENT_BONUS_PCT = 25  # если в матче была игра «категории недели»
+
+STREAK_COIN_BONUS_CAP = 10  # до +10% coins от стрика (1% за день до 10)
+SET_BONUS_PCT = 5            # +5% если собран сет (3 типа одного уровня в категории)
+
+RETURN_BONUS_DAYS = 3         # через N дней без захода — даётся бонус
+RETURN_BONUS_COINS = 300      # и сколько монет
+
+
+def _current_weekly_event() -> dict:
+    """Категория недели меняется раз в 7 дней детерминированно."""
+    from datetime import datetime as _dt, timezone as _tz
+    iso_week = _dt.now(_tz.utc).isocalendar().week
+    cat = WEEKLY_EVENT_CATEGORIES[iso_week % len(WEEKLY_EVENT_CATEGORIES)]
+    # Начало и конец текущей недели
+    now = _dt.now(_tz.utc)
+    # Понедельник = weekday 0
+    from datetime import timedelta as _td
+    monday = now - _td(days=now.weekday())
+    monday = monday.replace(hour=0, minute=0, second=0, microsecond=0)
+    sunday_end = monday + _td(days=7)
+    return {
+        "category": cat,
+        "bonus_pct": WEEKLY_EVENT_BONUS_PCT,
+        "week_num": iso_week,
+        "starts_at": monday.isoformat(),
+        "ends_at": sunday_end.isoformat(),
+    }
+
+
+CATEGORY_NAMES_RU = {
+    "reaction": "Реакция",
+    "logic": "Логика",
+    "memory": "Память",
+    "coordination": "Координация",
+    "trivia": "Эрудиция",
+}
+
+
+def _player_equipped_item(db: Session, player_id: int) -> Optional[dict]:
+    eq = db.query(ReflexAchievement).filter(
+        ReflexAchievement.player_id == player_id,
+        ReflexAchievement.code.like("item_equipped_%"),
+    ).first()
+    if not eq:
+        return None
+    iid = eq.code[len("item_equipped_"):]
+    return FULL_ITEM_CATALOG.get(iid)
+
+
+def _player_owned_items(db: Session, player_id: int) -> set:
+    return {r.code[len("item_owned_"):] for r in db.query(ReflexAchievement).filter(
+        ReflexAchievement.player_id == player_id,
+        ReflexAchievement.code.like("item_owned_%"),
+    ).all()}
+
+
+def _player_sets(owned_ids: set) -> dict:
+    """Возвращает {category: [levels_сет_собран]}."""
+    # Сет = 3 типа одной категории одного уровня
+    type_levels = {}  # (cat, level) -> set(type)
+    for iid in owned_ids:
+        it = FULL_ITEM_CATALOG.get(iid)
+        if not it: continue
+        k = (it["category"], it["level"])
+        type_levels.setdefault(k, set()).add(it["type"])
+    sets = {}
+    for (cat, lvl), types in type_levels.items():
+        if len(types) >= 3:  # все 3 типа собраны
+            sets.setdefault(cat, []).append(lvl)
+    return sets
+
+
+def _streak_current(db: Session, player_id: int) -> int:
+    row = db.query(ReflexLoginStreak).filter(
+        ReflexLoginStreak.player_id == player_id
+    ).first()
+    return row.current_streak or 0 if row else 0
+
+
+def compute_boost_info(db: Session, player_id: int, categories_in_match: list) -> dict:
+    """
+    Возвращает dict:
+    {
+      item: {name, pct, applies},
+      streak: {days, pct},
+      set: {pct, categories_active},
+      event: {category, pct, applies},
+      total_pct (capped), multiplier (1 + total/100),
+    }
+    """
+    # 1. Item boost
+    item = _player_equipped_item(db, player_id)
+    item_pct = 0
+    item_info = None
+    if item:
+        item_applies = (not categories_in_match) or (item["category"] in categories_in_match)
+        # Если надетый не попал в матч — даём половину
+        item_pct = item["boost_pct"] if item_applies else max(1, item["boost_pct"] // 2)
+        item_info = {
+            "id": item["id"], "name": item["name"], "category": item["category"],
+            "boost_pct": item["boost_pct"], "applied_pct": item_pct,
+            "applies_fully": item_applies,
+        }
+
+    # 2. Streak bonus
+    streak_days = _streak_current(db, player_id)
+    streak_pct = min(STREAK_COIN_BONUS_CAP, streak_days)
+
+    # 3. Sets bonus (если в матче была категория где собран сет)
+    owned = _player_owned_items(db, player_id)
+    sets = _player_sets(owned)
+    set_pct = 0
+    set_cats_active = []
+    for cat in categories_in_match:
+        if cat in sets:
+            set_pct += SET_BONUS_PCT
+            set_cats_active.append(cat)
+
+    # 4. Event bonus
+    ev = _current_weekly_event()
+    event_pct = 0
+    if ev["category"] in categories_in_match:
+        event_pct = ev["bonus_pct"]
+
+    total = item_pct + streak_pct + set_pct + event_pct
+    total_capped = min(MAX_BOOST_PCT, total)
+    return {
+        "item": item_info,
+        "streak": {"days": streak_days, "pct": streak_pct},
+        "set": {"pct": set_pct, "categories_active": set_cats_active, "all_sets": {k: sorted(v) for k, v in sets.items()}},
+        "event": {"category": ev["category"], "category_name": CATEGORY_NAMES_RU.get(ev["category"], ev["category"]), "pct": event_pct, "active": event_pct > 0},
+        "total_pct": total_capped,
+        "raw_total_pct": total,
+        "multiplier": 1 + total_capped / 100.0,
+    }
+
+
+def apply_coin_boost(db: Session, player_id: int, base_coins: int, categories_in_match: list) -> tuple:
+    """Возвращает (final_coins, boost_info). Не коммитит — просто считает."""
+    if base_coins <= 0:
+        return base_coins, None
+    info = compute_boost_info(db, player_id, categories_in_match or [])
+    final = int(round(base_coins * info["multiplier"]))
+    return final, info
+
+
+@router.get("/boost")
+def get_boost_info(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    """Показываем игроку: какие бусты активны сейчас (для UI "мои бусты")."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"authenticated": False}
+    payload = verify_token(authorization[7:])
+    if not payload:
+        return {"authenticated": False}
+    pid = payload.get("player_id")
+    # Полный расчёт «если бы матч был во всех 5 категориях»
+    info = compute_boost_info(db, pid, WEEKLY_EVENT_CATEGORIES)
+    ev = _current_weekly_event()
+    return {
+        "authenticated": True,
+        "boost": info,
+        "event": ev,
+        "cap_pct": MAX_BOOST_PCT,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+#   WEEKLY EVENT: публичный endpoint
+# ═══════════════════════════════════════════════════════════════
+
+@router.get("/weekly_event")
+def weekly_event(db: Session = Depends(get_db)):
+    ev = _current_weekly_event()
+    return {
+        **ev,
+        "category_name": CATEGORY_NAMES_RU.get(ev["category"], ev["category"]),
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+#   RETURN BONUS: если >= RETURN_BONUS_DAYS не заходил — даём монеты
+# ═══════════════════════════════════════════════════════════════
+
+@router.get("/return_bonus")
+def return_bonus_info(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"authenticated": False}
+    payload = verify_token(authorization[7:])
+    if not payload:
+        return {"authenticated": False}
+    pid = payload.get("player_id")
+    row = db.query(ReflexLoginStreak).filter(
+        ReflexLoginStreak.player_id == pid
+    ).first()
+    today = _today_str()
+    if not row or not row.last_login_date:
+        return {"authenticated": True, "available": False, "days_away": 0}
+    # Уже забрал сегодня?
+    taken = db.query(ReflexAchievement).filter(
+        ReflexAchievement.player_id == pid,
+        ReflexAchievement.code == f"return_bonus_{today}",
+    ).first()
+    if taken:
+        return {"authenticated": True, "available": False, "days_away": 0, "claimed_today": True}
+    from datetime import datetime as _dt
+    try:
+        last = _dt.strptime(row.last_login_date, "%Y-%m-%d")
+        now = _dt.strptime(today, "%Y-%m-%d")
+        days_away = (now - last).days
+    except Exception:
+        days_away = 0
+    return {
+        "authenticated": True,
+        "available": days_away >= RETURN_BONUS_DAYS,
+        "days_away": days_away,
+        "reward_coins": RETURN_BONUS_COINS,
+        "threshold_days": RETURN_BONUS_DAYS,
+    }
+
+
+@router.post("/return_bonus/claim")
+def return_bonus_claim(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"ok": False}
+    payload = verify_token(authorization[7:])
+    if not payload:
+        return {"ok": False}
+    pid = payload.get("player_id")
+    # Те же проверки, атомарно
+    row = db.query(ReflexLoginStreak).filter(
+        ReflexLoginStreak.player_id == pid
+    ).first()
+    today = _today_str()
+    taken = db.query(ReflexAchievement).filter(
+        ReflexAchievement.player_id == pid,
+        ReflexAchievement.code == f"return_bonus_{today}",
+    ).first()
+    if taken:
+        return {"ok": False, "msg": "Уже получено сегодня"}
+    from datetime import datetime as _dt
+    days_away = 0
+    try:
+        last = _dt.strptime(row.last_login_date, "%Y-%m-%d") if row and row.last_login_date else None
+        if last:
+            days_away = (_dt.strptime(today, "%Y-%m-%d") - last).days
+    except Exception:
+        pass
+    if days_away < RETURN_BONUS_DAYS:
+        return {"ok": False, "msg": f"Нужно не заходить {RETURN_BONUS_DAYS}+ дней"}
+    me = db.query(Player).filter(Player.id == pid).with_for_update().first()
+    if not me:
+        return {"ok": False}
+    me.coins = (me.coins or 0) + RETURN_BONUS_COINS
+    db.add(ReflexAchievement(player_id=pid, code=f"return_bonus_{today}"))
+    db.commit()
+    return {"ok": True, "coins_awarded": RETURN_BONUS_COINS, "new_coins": me.coins}
+
+
+# ═══════════════════════════════════════════════════════════════
+#   TITLES: получены за достижения, игрок выбирает активный
+# ═══════════════════════════════════════════════════════════════
+
+TITLES_CATALOG = {
+    # code → {name, condition_type, threshold, icon}
+    "t_first_blood":  {"name": "Первая кровь",       "requires": "first_win",  "icon": "🩸"},
+    "t_veteran":      {"name": "Ветеран",            "requires": "win_10",      "icon": "🎖️"},
+    "t_perfectionist":{"name": "Перфекционист",      "requires": "perfect",     "icon": "💯"},
+    "t_master_jack":  {"name": "Мастер на все руки", "requires": "diverse",     "icon": "🎭"},
+    "t_comeback_kid": {"name": "Камбекер",           "requires": "comeback",    "icon": "🔥"},
+    # Титулы за наборы предметов
+    "t_reaction_lord":     {"name": "Повелитель реакции",   "requires_set_cat": "reaction",     "icon": "🔴"},
+    "t_logic_archon":      {"name": "Архон Логики",         "requires_set_cat": "logic",        "icon": "🟡"},
+    "t_memory_sage":       {"name": "Мудрец Памяти",        "requires_set_cat": "memory",       "icon": "🟢"},
+    "t_coord_maestro":     {"name": "Маэстро Координации",  "requires_set_cat": "coordination", "icon": "🔵"},
+    "t_trivia_oracle":     {"name": "Оракул Эрудиции",      "requires_set_cat": "trivia",       "icon": "🟣"},
+    # Титулы за стрик
+    "t_streak_7":  {"name": "Неделя без остановки", "requires_streak": 7,  "icon": "🔥"},
+    "t_streak_30": {"name": "Месячник",              "requires_streak": 30, "icon": "☄️"},
+}
+
+
+def _titles_owned(db: Session, player_id: int) -> set:
+    owned = set()
+    # Достижения
+    ach_codes = {r.code for r in db.query(ReflexAchievement).filter(
+        ReflexAchievement.player_id == player_id,
+    ).all()}
+    # Сеты
+    owned_items = {c[len("item_owned_"):] for c in ach_codes if c.startswith("item_owned_")}
+    sets = _player_sets(owned_items)
+    # Стрик
+    row = db.query(ReflexLoginStreak).filter(
+        ReflexLoginStreak.player_id == player_id
+    ).first()
+    max_streak = (row.max_streak if row else 0) or 0
+    for tcode, t in TITLES_CATALOG.items():
+        if "requires" in t and t["requires"] in ach_codes:
+            owned.add(tcode)
+        if "requires_set_cat" in t and t["requires_set_cat"] in sets:
+            owned.add(tcode)
+        if "requires_streak" in t and max_streak >= t["requires_streak"]:
+            owned.add(tcode)
+    return owned
+
+
+@router.get("/titles")
+def titles_list(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"authenticated": False}
+    payload = verify_token(authorization[7:])
+    if not payload:
+        return {"authenticated": False}
+    pid = payload.get("player_id")
+    owned = _titles_owned(db, pid)
+    eq = db.query(ReflexAchievement).filter(
+        ReflexAchievement.player_id == pid,
+        ReflexAchievement.code.like("title_equipped_%"),
+    ).first()
+    active = eq.code[len("title_equipped_"):] if eq else None
+    return {
+        "authenticated": True,
+        "titles": [
+            {"id": k, "name": v["name"], "icon": v["icon"],
+             "owned": k in owned, "active": k == active}
+            for k, v in TITLES_CATALOG.items()
+        ],
+        "active": active,
+    }
+
+
+@router.post("/titles/equip")
+def titles_equip(data: dict, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"ok": False}
+    payload = verify_token(authorization[7:])
+    if not payload:
+        return {"ok": False}
+    pid = payload.get("player_id")
+    tid = (data or {}).get("title_id", "")
+    if tid and tid not in TITLES_CATALOG:
+        return {"ok": False, "msg": "Нет такого титула"}
+    if tid:
+        owned = _titles_owned(db, pid)
+        if tid not in owned:
+            return {"ok": False, "msg": "Не открыт"}
+    db.query(ReflexAchievement).filter(
+        ReflexAchievement.player_id == pid,
+        ReflexAchievement.code.like("title_equipped_%"),
+    ).delete(synchronize_session=False)
+    if tid:
+        db.add(ReflexAchievement(player_id=pid, code=f"title_equipped_{tid}"))
+    db.commit()
+    return {"ok": True, "active": tid or None}

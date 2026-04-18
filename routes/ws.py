@@ -717,7 +717,14 @@ class ReflexRoom:
                     if p:
                         p.xp = (p.xp or 0) + (5 if winner_role == human_role else 2)
                         if winner_role == human_role:
-                            p.coins = (p.coins or 0) + {"easy": 5, "medium": 10, "hard": 20}.get(self.ai_difficulty or "medium", 10)
+                            base = {"easy": 5, "medium": 10, "hard": 20}.get(self.ai_difficulty or "medium", 10)
+                            cats_in_match = list({GAME_CATEGORIES.get(r.get("game")) for r in self.rounds_log if GAME_CATEGORIES.get(r.get("game"))})
+                            try:
+                                from routes.api import apply_coin_boost
+                                final_coins, _ = apply_coin_boost(db, p.id, base, cats_in_match)
+                            except Exception:
+                                final_coins = base
+                            p.coins = (p.coins or 0) + final_coins
                         # Дневные задачи: vs_ai_win + play + уникальные игры
                         max_rs = max(
                             (r.get("p1_score" if human_role == "p1" else "p2_score", 0) for r in self.rounds_log),
@@ -800,11 +807,25 @@ class ReflexRoom:
                     m.winner_id = p2.id
 
                 pot = self.stake * 2
+                # Категории игр этого матча — для применения бустов
+                cats_in_match = list({GAME_CATEGORIES.get(r.get("game")) for r in self.rounds_log if GAME_CATEGORIES.get(r.get("game"))})
+                try:
+                    from routes.api import apply_coin_boost
+                except Exception:
+                    apply_coin_boost = None
+                def _boost(pid, base):
+                    if apply_coin_boost is None or base <= 0:
+                        return base
+                    try:
+                        v, _ = apply_coin_boost(db, pid, base, cats_in_match)
+                        return v
+                    except Exception:
+                        return base
                 if winner_role == "p1":
-                    p1.coins = (p1.coins or 0) + pot + 20
+                    p1.coins = (p1.coins or 0) + pot + _boost(p1.id, 20)
                     p1.xp = (p1.xp or 0) + 15
                 elif winner_role == "p2":
-                    p2.coins = (p2.coins or 0) + pot + 20
+                    p2.coins = (p2.coins or 0) + pot + _boost(p2.id, 20)
                     p2.xp = (p2.xp or 0) + 15
                 else:
                     p1.coins = (p1.coins or 0) + self.stake
