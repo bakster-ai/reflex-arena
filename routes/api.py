@@ -3289,7 +3289,7 @@ def auth_telegram(data: dict, db: Session = Depends(get_db)):
 
 
 def _upsert_tg_player(db: Session, tg_id: int, tg_nick: str, first_name: str = ""):
-    from core.auth import create_access_token
+    from core.auth import make_token
     # Ищем по ач-коду tg_id
     existing = db.query(ReflexAchievement).filter(
         ReflexAchievement.code == f"tg_id_{tg_id}",
@@ -3314,7 +3314,7 @@ def _upsert_tg_player(db: Session, tg_id: int, tg_nick: str, first_name: str = "
         db.add(pl); db.flush()
         db.add(ReflexAchievement(player_id=pl.id, code=f"tg_id_{tg_id}"))
         db.commit()
-    token = create_access_token({"player_id": pl.id, "nickname": pl.nickname})
+    token = make_token(pl.id, pl.nickname)
     return {
         "ok": True,
         "token": token,

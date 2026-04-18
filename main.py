@@ -3,7 +3,6 @@ Reflex Arena — standalone app.
 Self-contained FastAPI service. Separate DB, separate auth, no dependencies on ping-pong platform.
 """
 import os
-from collections import deque
 import time as _time
 
 from fastapi import FastAPI, Request
@@ -14,10 +13,17 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy import text
 
 from core.database import engine, Base
+from core.logging_setup import setup_logging, new_request_id, bind_request_id, get_logger
+from core.rate_limit import check_and_incr, is_redis_active
+from core.scheduler import start_scheduler, stop_scheduler
 from models import models  # noqa — регистрация моделей
 from routes import auth as auth_routes
 from routes import api as api_routes
 from routes import ws as ws_routes
+
+# ── Structured logging — первым делом ──
+setup_logging()
+log = get_logger("main")
 
 # ── Создание таблиц ──
 Base.metadata.create_all(bind=engine)
@@ -165,7 +171,25 @@ def run_migrations():
                 except Exception: pass
 
 
-run_migrations()
+def run_alembic_upgrade():
+    """Пробуем использовать Alembic upgrade head. Если не получается — fallback на run_migrations()."""
+    try:
+        from alembic.config import Config as _AlembicCfg
+        from alembic import command as _alembic_cmd
+        cfg_path = os.path.join(os.path.dirname(__file__), "alembic.ini")
+        if os.path.exists(cfg_path):
+            cfg = _AlembicCfg(cfg_path)
+            _alembic_cmd.upgrade(cfg, "head")
+            log.info("alembic upgrade head OK")
+            return True
+    except Exception as e:
+        log.warning(f"alembic failed, fallback to legacy run_migrations: {e}")
+    return False
+
+
+# Сначала Alembic, потом наш legacy-путь как страховка
+if not run_alembic_upgrade():
+    run_migrations()
 
 
 # ── FastAPI app ──
@@ -199,22 +223,74 @@ if _sentry_dsn:
             profiles_sample_rate=0.05,
             environment=os.environ.get("SENTRY_ENV", "production"),
         )
-        print("Sentry initialized")
+        log.info("sentry initialized")
     except Exception as e:
-        print(f"Sentry init failed: {e}")
+        log.error(f"sentry init failed: {e}")
 
-# ── Rate limiting (in-memory sliding window) ──
+
+# ── Startup / shutdown: scheduler ──
+@app.on_event("startup")
+async def _on_startup():
+    log.info("app starting", extra={"redis": is_redis_active()})
+    # Запускаем scheduler только вне тестов
+    if os.environ.get("DISABLE_SCHEDULER", "") != "1":
+        try:
+            start_scheduler()
+        except Exception as e:
+            log.error(f"scheduler start failed: {e}")
+
+
+@app.on_event("shutdown")
+async def _on_shutdown():
+    log.info("app stopping")
+    stop_scheduler()
+
+# ── Correlation-ID middleware: кладёт request_id в context для всех логов ──
+@app.middleware("http")
+async def correlation_id_mw(request: Request, call_next):
+    rid = request.headers.get("x-request-id") or new_request_id()
+    bind_request_id(rid)
+    t0 = _time.time()
+    try:
+        resp = await call_next(request)
+    except Exception:
+        log.exception("http request failed",
+                      extra={"method": request.method, "path": request.url.path})
+        raise
+    try:
+        resp.headers["X-Request-ID"] = rid
+    except Exception:
+        pass
+    # Логируем только то что относится к api/ws (чтобы не спамить на static)
+    dur_ms = int((_time.time() - t0) * 1000)
+    path = request.url.path
+    if path.startswith("/api") or path.startswith("/ws") or path in ("/", "/admin"):
+        log.info("http",
+                 extra={"method": request.method, "path": path,
+                        "status": resp.status_code, "dur_ms": dur_ms})
+    return resp
+
+
+# ── Rate limiting (Redis при наличии, in-memory fallback) ──
 _RATE_LIMITS = {
     "/api/auth/guest":       (5, 60),
     "/api/auth/register":    (5, 60),
     "/api/auth/login":       (10, 60),
+    "/api/auth/telegram":    (20, 60),
     "/api/shop/":            (30, 60),
+    "/api/gems/":            (20, 60),
+    "/api/payments/":        (10, 60),
     "/api/friends/":         (30, 60),
     "/api/daily_challenge/submit": (30, 60),
     "/api/pass/":            (30, 60),
     "/api/cases/":           (20, 60),
+    "/api/report_player":    (10, 600),  # 10 жалоб за 10 минут
+    "/api/clubs/create":     (3, 3600),  # 3 клуба в час (анти-спам)
+    "/api/clubs/chat/send":  (30, 60),
+    "/api/tournament/signup": (5, 3600),
+    "/api/ads/reward":       (10, 60),
+    "/api/admin/":           (60, 60),
 }
-_rate_buckets: dict = {}
 
 
 @app.middleware("http")
@@ -231,16 +307,12 @@ async def rate_limit(request: Request, call_next):
     if not ip and request.client:
         ip = request.client.host
     if not ip: ip = "unknown"
-    key = (prefix, ip)
-    now = _time.time()
-    bucket = _rate_buckets.get(key)
-    if bucket is None:
-        bucket = deque(); _rate_buckets[key] = bucket
-    while bucket and bucket[0] < now - window:
-        bucket.popleft()
-    if len(bucket) >= max_req:
+    key = f"{prefix}:{ip}"
+    allowed, count = check_and_incr(key, max_req, window)
+    if not allowed:
+        log.warning("rate_limited",
+                    extra={"path": path, "ip": ip, "count": count, "limit": max_req})
         return JSONResponse({"error": "rate_limited", "retry_after": window}, status_code=429)
-    bucket.append(now)
     return await call_next(request)
 
 
@@ -326,6 +398,20 @@ def _render_index() -> Response:
             html = f.read()
     except Exception:
         return Response("index.html not found", status_code=500)
+    # Инжектим конфиг рекламы в окно (opt-in через env)
+    import json as _json
+    ad_cfg = {"provider": "stub"}
+    adsense_client = os.environ.get("ADSENSE_CLIENT", "")
+    adsense_slot = os.environ.get("ADSENSE_SLOT", "")
+    if adsense_client and adsense_slot:
+        ad_cfg = {
+            "provider": "adsense",
+            "adsense_client": adsense_client,
+            "adsense_slot": adsense_slot,
+        }
+    injection = f'<script>window.__AD_CONFIG={_json.dumps(ad_cfg)};</script>'
+    # Вставляем перед </head>
+    html = html.replace("</head>", f"{injection}\n</head>", 1)
     from fastapi.responses import HTMLResponse
     return HTMLResponse(content=html, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 

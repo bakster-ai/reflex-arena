@@ -4796,9 +4796,19 @@ async function loadAdsStatus() {
   } catch (e) {}
 }
 
+// Конфиг AdSense — если задан, показываем реальный блок, иначе stub
+// Устанавливается сервером через window.__AD_CONFIG (генерится из env)
+const AD_CONFIG = window.__AD_CONFIG || { provider: 'stub' };
+
 async function watchAd() {
-  // В продакшне: показываем AdSense/Yandex ad, после success — POST /api/ads/reward
-  // Сейчас stub: fake 3-сек таймер
+  if (AD_CONFIG.provider === 'adsense' && AD_CONFIG.adsense_client && AD_CONFIG.adsense_slot) {
+    return watchAdSenseReal();
+  }
+  // Fallback stub: 3-секундный overlay
+  return watchAdStub();
+}
+
+function watchAdStub() {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;z-index:9500;';
   overlay.innerHTML = `
@@ -4815,18 +4825,60 @@ async function watchAd() {
     if (left <= 0) {
       clearInterval(tick);
       overlay.remove();
-      API.post('/api/ads/reward', {}).then(r => {
-        if (r.ok) {
-          hap('success');
-          ME.coins = r.new_coins; renderTop();
-          loadAdsStatus();
-          alert(`+${r.coins_awarded} 💰`);
-        } else alert(r.msg || 'Ошибка');
-      });
+      _claimAdReward();
     } else {
       document.getElementById('ad-countdown').textContent = left;
     }
   }, 1000);
+}
+
+function watchAdSenseReal() {
+  // Подгружаем AdSense SDK один раз
+  if (!window.__adsense_loaded) {
+    const s = document.createElement('script');
+    s.async = true;
+    s.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${AD_CONFIG.adsense_client}`;
+    s.crossOrigin = 'anonymous';
+    document.head.appendChild(s);
+    window.__adsense_loaded = true;
+  }
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.95);display:flex;align-items:center;justify-content:center;z-index:9500;flex-direction:column;';
+  overlay.innerHTML = `
+    <div style="background:#fff;width:300px;height:250px;display:flex;align-items:center;justify-content:center;">
+      <ins class="adsbygoogle" style="display:inline-block;width:300px;height:250px;" data-ad-client="${AD_CONFIG.adsense_client}" data-ad-slot="${AD_CONFIG.adsense_slot}"></ins>
+    </div>
+    <div style="color:#fff;margin-top:16px;" id="ad-progress">Смотри внимательно — <span id="ad-countdown">5</span>с</div>
+    <button id="ad-skip" style="margin-top:8px;display:none;background:var(--accent);color:#1a1205;padding:8px 18px;border:none;border-radius:8px;font-weight:700;cursor:pointer;">Забрать награду</button>
+  `;
+  document.body.appendChild(overlay);
+  try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (_) {}
+  let left = 5;
+  const tick = setInterval(() => {
+    left--;
+    if (left <= 0) {
+      clearInterval(tick);
+      document.getElementById('ad-progress').style.display = 'none';
+      document.getElementById('ad-skip').style.display = '';
+    } else {
+      document.getElementById('ad-countdown').textContent = left;
+    }
+  }, 1000);
+  document.getElementById('ad-skip').onclick = () => {
+    overlay.remove();
+    _claimAdReward();
+  };
+}
+
+function _claimAdReward() {
+  API.post('/api/ads/reward', {}).then(r => {
+    if (r.ok) {
+      hap('success');
+      ME.coins = r.new_coins; renderTop();
+      loadAdsStatus();
+      alert(`+${r.coins_awarded} 💰`);
+    } else alert(r.msg || 'Ошибка');
+  });
 }
 
 // ─── Placement matches ───
