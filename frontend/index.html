@@ -10,6 +10,12 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <!-- Telegram Mini App SDK (no-op если не в TG) -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Google Fonts: Inter для UI, Space Grotesk для чисел/заголовков -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <!-- Confetti / juice library (15kb) -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Reflex" />
@@ -1290,6 +1296,434 @@
     body[data-style="brutal"] .game-area { background: #fff; }
     body[data-style="brutal"] #top-nick { color: #000; font-weight: 900; }
 
+    /* ═══════════════════════════════════════════════════════════════
+       DESIGN OVERHAUL — оставляем все старые стили как fallback.
+       Переопределяем через body:not([data-style]) чтобы темы работали.
+       ═══════════════════════════════════════════════════════════════ */
+    :root {
+      /* Richer dark palette с deep navy base */
+      --bg-overhaul: #05070d;
+      --bg-gradient: radial-gradient(ellipse at top, #101930 0%, #05070d 60%);
+      --panel-overhaul: linear-gradient(155deg, rgba(28,32,48,0.92) 0%, rgba(18,22,36,0.92) 100%);
+      --panel-border: rgba(255,255,255,0.06);
+      --panel-hilite: rgba(255,255,255,0.04);
+      --text-overhaul: #f1f4fa;
+      --muted-overhaul: #8a95b3;
+      /* Акцентные градиенты */
+      --grad-primary: linear-gradient(135deg, #ff6a00 0%, #ff3d7f 50%, #a855f7 100%);
+      --grad-win: linear-gradient(135deg, #26d67f 0%, #10b981 100%);
+      --grad-lose: linear-gradient(135deg, #ff4d6d 0%, #c026d3 100%);
+      --grad-elite: linear-gradient(135deg, #fbbf24 0%, #f97316 50%, #ec4899 100%);
+      --grad-cool: linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #8b5cf6 100%);
+      /* Neon accents */
+      --neon-orange: #ff7a29;
+      --neon-pink: #ff3d7f;
+      --neon-cyan: #06e7ff;
+      --neon-purple: #a855f7;
+      --neon-gold: #fbbf24;
+      /* Шрифты */
+      --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-display: 'Space Grotesk', 'Inter', sans-serif;
+      /* Shadows */
+      --shadow-glow-orange: 0 0 24px rgba(255,122,41,0.35), 0 4px 16px rgba(255,61,127,0.18);
+      --shadow-card: 0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
+      --shadow-lift: 0 12px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04);
+    }
+
+    body:not([data-style]) {
+      background: var(--bg-overhaul) !important;
+      background-image: var(--bg-gradient) !important;
+      background-attachment: fixed !important;
+      font-family: var(--font-ui) !important;
+      color: var(--text-overhaul) !important;
+    }
+    body:not([data-style])::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(900px 500px at 10% -10%, rgba(255,61,127,0.10), transparent 60%),
+        radial-gradient(700px 500px at 90% 0%, rgba(6,231,255,0.08), transparent 55%),
+        radial-gradient(600px 400px at 50% 110%, rgba(168,85,247,0.10), transparent 55%);
+      animation: bgPulse 16s ease-in-out infinite alternate;
+    }
+    @keyframes bgPulse {
+      0%   { opacity: 0.85; }
+      100% { opacity: 1.00; }
+    }
+
+    /* Glassmorphic топбар */
+    body:not([data-style]) .topbar {
+      background: rgba(10,14,24,0.72) !important;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+      position: relative; z-index: 100;
+    }
+    body:not([data-style]) .topbar .logo {
+      background: var(--grad-primary);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent !important;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+    }
+    body:not([data-style]) .chip {
+      background: rgba(255,255,255,0.04) !important;
+      border: 1px solid rgba(255,255,255,0.08) !important;
+      font-family: var(--font-display);
+      font-weight: 700;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    body:not([data-style]) .chip:hover {
+      transform: translateY(-1px);
+      border-color: rgba(255,122,41,0.4) !important;
+    }
+
+    /* Карточки (panel) — gradient bg + inner highlight */
+    body:not([data-style]) .panel {
+      background: var(--panel-overhaul) !important;
+      border: 1px solid var(--panel-border) !important;
+      border-radius: 18px !important;
+      box-shadow: var(--shadow-card);
+      position: relative;
+      overflow: hidden;
+    }
+    body:not([data-style]) .panel::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent);
+      pointer-events: none;
+    }
+    body:not([data-style]) .panel h3 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: -0.2px;
+    }
+
+    /* Home cards — лифт + gradient border on hover */
+    body:not([data-style]) .home-card {
+      background: var(--panel-overhaul) !important;
+      border: 1px solid var(--panel-border) !important;
+      border-radius: 20px !important;
+      transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s, border-color 0.25s;
+      position: relative;
+      overflow: hidden;
+    }
+    body:not([data-style]) .home-card::after {
+      content: ''; position: absolute; inset: 0;
+      background: var(--grad-primary);
+      opacity: 0; transition: opacity 0.25s;
+      pointer-events: none; mix-blend-mode: overlay;
+      border-radius: inherit;
+    }
+    body:not([data-style]) .home-card:hover {
+      transform: translateY(-4px) scale(1.02);
+      box-shadow: var(--shadow-lift);
+      border-color: rgba(255,122,41,0.3) !important;
+    }
+    body:not([data-style]) .home-card:hover::after { opacity: 0.08; }
+    body:not([data-style]) .home-card.primary {
+      background: linear-gradient(135deg, rgba(255,106,0,0.18), rgba(168,85,247,0.18)) !important;
+      border-color: rgba(255,122,41,0.35) !important;
+    }
+    body:not([data-style]) .home-card .ic {
+      filter: drop-shadow(0 2px 8px rgba(255,122,41,0.3));
+    }
+
+    /* Hero с анимированным фоном */
+    body:not([data-style]) .home-hero {
+      padding: 28px 20px 18px !important;
+      text-align: center;
+      position: relative;
+    }
+    body:not([data-style]) .home-hero h1 {
+      font-family: var(--font-display) !important;
+      font-weight: 700 !important;
+      font-size: 40px !important;
+      background: var(--grad-elite);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent !important;
+      letter-spacing: -1px;
+      margin-bottom: 4px;
+      animation: heroShine 5s ease-in-out infinite alternate;
+    }
+    @keyframes heroShine {
+      0%   { filter: brightness(0.95) saturate(1.0); }
+      100% { filter: brightness(1.15) saturate(1.4); }
+    }
+    body:not([data-style]) .home-hero .sub {
+      font-size: 13px !important;
+      color: var(--muted-overhaul) !important;
+      letter-spacing: 0.3px;
+    }
+    @media (max-width: 480px) {
+      body:not([data-style]) .home-hero h1 { font-size: 32px !important; }
+    }
+
+    /* Большие CTA кнопки */
+    body:not([data-style]) .play-btn,
+    body:not([data-style]) .stake-btn.selected {
+      background: var(--grad-primary) !important;
+      color: #fff !important;
+      border: none !important;
+      font-weight: 800 !important;
+      font-family: var(--font-display) !important;
+      letter-spacing: 0.3px !important;
+      box-shadow: var(--shadow-glow-orange) !important;
+      transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s !important;
+      position: relative;
+      overflow: hidden;
+    }
+    body:not([data-style]) .play-btn::before,
+    body:not([data-style]) .stake-btn.selected::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+      transform: translateX(-100%);
+      transition: transform 0.6s;
+      pointer-events: none;
+    }
+    body:not([data-style]) .play-btn:hover::before,
+    body:not([data-style]) .stake-btn.selected:hover::before {
+      transform: translateX(100%);
+    }
+    body:not([data-style]) .play-btn:active,
+    body:not([data-style]) .stake-btn.selected:active {
+      transform: scale(0.96);
+    }
+
+    /* Обычные stake-btn (не selected) — outline */
+    body:not([data-style]) .stake-btn:not(.selected) {
+      background: rgba(255,255,255,0.03) !important;
+      border: 1px solid rgba(255,255,255,0.12) !important;
+      color: var(--text-overhaul) !important;
+      font-weight: 600 !important;
+      transition: all 0.15s !important;
+    }
+    body:not([data-style]) .stake-btn:not(.selected):hover {
+      background: rgba(255,255,255,0.06) !important;
+      border-color: rgba(255,122,41,0.4) !important;
+    }
+
+    /* Match-header в игре */
+    body:not([data-style]) .match-header {
+      background: rgba(10,14,24,0.72) !important;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+    }
+    body:not([data-style]) .player-box .name {
+      font-family: var(--font-display);
+      font-weight: 700;
+    }
+    body:not([data-style]) .player-box .score {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 28px;
+      background: var(--grad-primary);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent !important;
+    }
+
+    /* Цифры / счёт — Space Grotesk */
+    body:not([data-style]) .stat .v,
+    body:not([data-style]) #top-elo,
+    body:not([data-style]) .final-score {
+      font-family: var(--font-display) !important;
+      font-weight: 700 !important;
+      letter-spacing: -0.5px;
+    }
+    body:not([data-style]) #top-coins,
+    body:not([data-style]) #top-gems {
+      font-family: var(--font-display) !important;
+      font-weight: 700;
+    }
+
+    /* Navigation (bottom tabs) */
+    body:not([data-style]) nav[class*="bottom"],
+    body:not([data-style]) .tab-bar,
+    body:not([data-style]) [data-tab-btn]:first-of-type,
+    body:not([data-style]) .screen#screen-app > div:last-of-type {
+      /* no-op, handled below */
+    }
+    body:not([data-style]) button[data-tab-btn] {
+      font-family: var(--font-ui) !important;
+      transition: color 0.15s, transform 0.1s !important;
+    }
+    body:not([data-style]) button[data-tab-btn]:active { transform: scale(0.94); }
+
+    /* Game-area — плавное появление */
+    body:not([data-style]) .game-area {
+      animation: fadeInUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ═══ Screen shake (juice) ═══ */
+    @keyframes screenShake {
+      0%, 100% { transform: translate(0, 0); }
+      10% { transform: translate(-4px, -2px) rotate(-0.3deg); }
+      20% { transform: translate(4px, -1px) rotate(0.3deg); }
+      30% { transform: translate(-3px, 2px) rotate(0deg); }
+      40% { transform: translate(3px, 1px) rotate(0.2deg); }
+      50% { transform: translate(-2px, -1px) rotate(-0.2deg); }
+      60% { transform: translate(2px, 1px) rotate(0deg); }
+      70% { transform: translate(-1px, 0) rotate(0.1deg); }
+      80% { transform: translate(1px, -1px) rotate(-0.1deg); }
+      90% { transform: translate(-1px, 1px) rotate(0deg); }
+    }
+    .shake-sm { animation: screenShake 0.35s cubic-bezier(.36,.07,.19,.97) both; }
+    .shake-lg { animation: screenShake 0.6s  cubic-bezier(.36,.07,.19,.97) both; }
+
+    /* ═══ Ripple on tap ═══ */
+    .ripple { position: relative; overflow: hidden; }
+    .ripple::after {
+      content: ''; position: absolute; width: 200%; padding-top: 200%;
+      top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
+      background: radial-gradient(circle, rgba(255,255,255,0.35) 0%, transparent 60%);
+      opacity: 0; transition: transform 0.4s, opacity 0.4s;
+      pointer-events: none; border-radius: 50%;
+    }
+    .ripple.rippling::after {
+      transform: translate(-50%, -50%) scale(1); opacity: 1;
+      transition: transform 0.4s ease-out, opacity 0s;
+    }
+
+    /* ═══ Tier-эмблема ═══ */
+    .tier-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 3px 10px 3px 6px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      font-family: var(--font-display); font-weight: 700; font-size: 12px;
+      letter-spacing: 0.2px;
+    }
+    .tier-badge .tb-icon {
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; color: #fff; font-weight: 900;
+      box-shadow: 0 0 12px currentColor;
+    }
+    .tier-badge.bronze .tb-icon { background: linear-gradient(135deg, #cd7f32, #a0522d); color: #cd7f32; }
+    .tier-badge.silver .tb-icon { background: linear-gradient(135deg, #e5e7eb, #9ca3af); color: #c0c0c0; }
+    .tier-badge.gold .tb-icon { background: linear-gradient(135deg, #fcd34d, #f59e0b); color: #ffd700; }
+    .tier-badge.platinum .tb-icon { background: linear-gradient(135deg, #7dd3fc, #06b6d4); color: #7dd3fc; }
+    .tier-badge.diamond .tb-icon { background: linear-gradient(135deg, #a78bfa, #7c3aed); color: #a78bfa; }
+    .tier-badge.master .tb-icon { background: linear-gradient(135deg, #fb923c, #c026d3); color: #ff7a29; }
+    .tier-badge.grandmaster .tb-icon { background: var(--grad-elite); color: #ff4081; animation: gmPulse 2s ease-in-out infinite alternate; }
+    @keyframes gmPulse {
+      0%   { box-shadow: 0 0 12px #ff4081; }
+      100% { box-shadow: 0 0 24px #ff4081, 0 0 40px #f97316; }
+    }
+
+    /* ═══ Number ticker ═══ */
+    .num-tick { display: inline-block; font-variant-numeric: tabular-nums; }
+
+    /* ═══ Rarity glow для предметов коллекции ═══ */
+    .rarity-common    { box-shadow: inset 0 0 0 1px rgba(156,163,175,0.3); }
+    .rarity-uncommon  { box-shadow: inset 0 0 0 1px rgba(38,214,127,0.5), 0 0 12px rgba(38,214,127,0.15); }
+    .rarity-rare      { box-shadow: inset 0 0 0 1px rgba(59,130,246,0.6), 0 0 16px rgba(59,130,246,0.2); }
+    .rarity-epic      { box-shadow: inset 0 0 0 1px rgba(168,85,247,0.7), 0 0 20px rgba(168,85,247,0.25); }
+    .rarity-legendary {
+      box-shadow: inset 0 0 0 1px rgba(251,191,36,0.8), 0 0 24px rgba(251,191,36,0.35);
+      animation: legGlow 2.5s ease-in-out infinite alternate;
+    }
+    @keyframes legGlow {
+      0%   { box-shadow: inset 0 0 0 1px rgba(251,191,36,0.6), 0 0 18px rgba(251,191,36,0.25); }
+      100% { box-shadow: inset 0 0 0 1px rgba(251,191,36,1),   0 0 32px rgba(251,191,36,0.55); }
+    }
+
+    /* ═══ Seasonal panel — специальный градиент ═══ */
+    body:not([data-style]) #seasonal-panel,
+    body:not([data-style]) #event-panel,
+    body:not([data-style]) #boost-panel-home,
+    body:not([data-style]) #ads-panel,
+    body:not([data-style]) #placement-panel {
+      position: relative;
+    }
+    body:not([data-style]) #seasonal-panel::before {
+      background: linear-gradient(90deg, #ff6a00, #a855f7, #06e7ff, #ff6a00) !important;
+      background-size: 200% 100% !important;
+      animation: seasonalShimmer 4s linear infinite !important;
+      height: 2px !important;
+    }
+    @keyframes seasonalShimmer {
+      0%   { background-position: 0% 50%; }
+      100% { background-position: 200% 50%; }
+    }
+
+    /* ═══ Скроллбар ═══ */
+    body:not([data-style]) *::-webkit-scrollbar { width: 6px; height: 6px; }
+    body:not([data-style]) *::-webkit-scrollbar-track { background: transparent; }
+    body:not([data-style]) *::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.1); border-radius: 3px;
+    }
+    body:not([data-style]) *::-webkit-scrollbar-thumb:hover { background: rgba(255,122,41,0.4); }
+
+    /* ═══ Confetti canvas — поверх всего ═══ */
+    #confetti-canvas {
+      position: fixed; inset: 0; pointer-events: none;
+      z-index: 9998;
+    }
+
+    /* ═══ Match-finished emoji pulse ═══ */
+    body:not([data-style]) #fin-emoji {
+      animation: finishPulse 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes finishPulse {
+      0%   { transform: scale(0) rotate(-180deg); opacity: 0; }
+      60%  { transform: scale(1.2) rotate(10deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0); opacity: 1; }
+    }
+
+    /* ═══ Lobby grid — анимированный вход ═══ */
+    body:not([data-style]) .lobby .panel {
+      opacity: 0; transform: translateY(12px);
+      animation: panelEnter 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    body:not([data-style]) .lobby .panel:nth-child(1) { animation-delay: 0.05s; }
+    body:not([data-style]) .lobby .panel:nth-child(2) { animation-delay: 0.10s; }
+    body:not([data-style]) .lobby .panel:nth-child(3) { animation-delay: 0.15s; }
+    body:not([data-style]) .lobby .panel:nth-child(4) { animation-delay: 0.20s; }
+    body:not([data-style]) .lobby .panel:nth-child(5) { animation-delay: 0.25s; }
+    body:not([data-style]) .lobby .panel:nth-child(6) { animation-delay: 0.30s; }
+    @keyframes panelEnter {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ═══ Tab transition ═══ */
+    body:not([data-style]) [data-tab-content] {
+      animation: tabEnter 0.3s ease-out;
+    }
+    @keyframes tabEnter {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ═══ Auth modal — glass ═══ */
+    body:not([data-style]) .auth-modal,
+    body:not([data-style]) .bp-inner,
+    body:not([data-style]) #claim-modal .claim-inner,
+    body:not([data-style]) #onboard-modal > div {
+      background: linear-gradient(155deg, rgba(28,32,48,0.95) 0%, rgba(18,22,36,0.95) 100%) !important;
+      backdrop-filter: blur(30px) saturate(180%);
+      -webkit-backdrop-filter: blur(30px) saturate(180%);
+      border: 1px solid rgba(255,255,255,0.08) !important;
+      box-shadow: var(--shadow-lift);
+    }
+
+    /* Убираем старый стык border у topbar */
+    body:not([data-style]) .screen#screen-app { position: relative; z-index: 1; }
+
+    /* ═══ Media: reduced motion ═══ */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
   </style>
 </head>
 <body><!--STYLE-PLACEHOLDER-->
@@ -1807,6 +2241,65 @@ let queueTimer = null;
 
 function $(id) { return document.getElementById(id); }
 
+// ═══ JUICE utilities: confetti, screen shake, number ticker, ripple ═══
+function juiceConfetti(kind) {
+  if (!window.confetti) return;
+  const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9998 };
+  if (kind === 'victory') {
+    // Большой салют с разных точек
+    const colors = ['#ff6a00', '#ff3d7f', '#a855f7', '#06e7ff', '#fbbf24'];
+    const count = 200;
+    function fire(particleRatio, opts) {
+      window.confetti({ ...defaults, ...opts, colors, particleCount: Math.floor(count * particleRatio) });
+    }
+    fire(0.25, { spread: 26, startVelocity: 55, origin: { x: 0.2, y: 0.7 }});
+    fire(0.2,  { spread: 60,                   origin: { x: 0.5, y: 0.7 }});
+    fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8, origin: { x: 0.8, y: 0.7 }});
+    fire(0.1,  { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2, origin: { x: 0.5, y: 0.7 }});
+    fire(0.1,  { spread: 120, startVelocity: 45, origin: { x: 0.5, y: 0.7 }});
+  } else if (kind === 'round_win') {
+    window.confetti({ ...defaults, particleCount: 40, spread: 70, origin: { y: 0.6 },
+      colors: ['#26d67f', '#10b981', '#6ee7b7'] });
+  } else if (kind === 'gem' || kind === 'legendary') {
+    window.confetti({ ...defaults, particleCount: 80, spread: 100, origin: { y: 0.5 },
+      colors: ['#fbbf24', '#f59e0b', '#f97316'], shapes: ['star'], scalar: 1.2 });
+  }
+}
+function juiceShake(el, kind) {
+  if (!el) el = document.getElementById('screen-match') || document.body;
+  el.classList.remove('shake-sm', 'shake-lg');
+  // Restart animation
+  void el.offsetWidth;
+  el.classList.add(kind === 'lg' ? 'shake-lg' : 'shake-sm');
+  setTimeout(() => el.classList.remove('shake-sm', 'shake-lg'), 700);
+}
+// Number ticker: плавно меняет число от-до за N мс
+function juiceTick(el, from, to, dur) {
+  if (!el) return;
+  dur = dur || 700;
+  const t0 = performance.now();
+  from = Number(from) || 0;
+  to = Number(to) || 0;
+  function tick(now) {
+    const p = Math.min(1, (now - t0) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);  // easeOutCubic
+    const v = Math.round(from + (to - from) * eased);
+    el.textContent = v;
+    if (p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+// Auto-ripple на любой .play-btn / .stake-btn
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.play-btn, .stake-btn, .home-card, button[data-tab-btn]');
+  if (!btn) return;
+  btn.classList.add('ripple');
+  btn.classList.remove('rippling');
+  void btn.offsetWidth;
+  btn.classList.add('rippling');
+  setTimeout(() => btn.classList.remove('rippling'), 450);
+}, true);
+
 // Haptic feedback (vibrate API или TG HapticFeedback если в TG Mini App)
 function hap(kind) {
   try {
@@ -2254,13 +2747,19 @@ function renderTop() {
   $('top-nick').textContent = nick;
   $('top-coins').textContent = ME.coins ?? 0;
   const gemEl = $('top-gems'); if (gemEl) gemEl.textContent = ME.gems ?? 0;
-  // Tier + ELO
+  // Tier + ELO — красивый бейдж с градиентом
   const t = ME.tier || null;
+  const chip = $('top-tier-chip');
   if (t) {
-    $('top-elo').innerHTML = `${t.icon} ${t.tier_ru}${t.division ? ' ' + t.division : ''}`;
-    $('top-elo').style.color = t.color;
-    const chip = $('top-tier-chip');
-    if (chip) chip.title = `${t.tier_ru} ${t.division} • ELO ${Math.round(elo)}`;
+    const tierClass = (t.tier || 'bronze').toLowerCase();
+    $('top-elo').innerHTML = `<span class="tier-badge ${tierClass}"><span class="tb-icon">${t.icon}</span><span style="color:${t.color};">${t.tier_ru}${t.division ? ' ' + t.division : ''}</span></span>`;
+    $('top-elo').style.color = '';
+    if (chip) {
+      chip.style.background = 'transparent';
+      chip.style.border = 'none';
+      chip.style.padding = '0';
+      chip.title = `${t.tier_ru} ${t.division} • ELO ${Math.round(elo)}`;
+    }
   } else {
     $('top-elo').innerHTML = `${l.icon} ${Math.round(elo)}`;
     $('top-elo').style.color = l.color;
@@ -4570,8 +5069,17 @@ async function openCaseUI(caseId, price) {
     </div>
   `;
   document.body.appendChild(overlay);
-  if (r.item.rarity === 'legendary') playVictoryVfx('stars');
-  else if (r.item.rarity === 'epic') playVictoryVfx('confetti');
+  // Juice-layer: конфетти и shake при редких выпадениях
+  if (r.item.rarity === 'legendary') {
+    juiceShake(document.body, 'lg');
+    juiceConfetti('legendary');
+    playVictoryVfx('stars');
+  } else if (r.item.rarity === 'epic') {
+    juiceConfetti('round_win');
+    playVictoryVfx('confetti');
+  } else if (r.item.rarity === 'rare') {
+    juiceConfetti('round_win');
+  }
 }
 
 async function loadCollection() {
@@ -4589,9 +5097,11 @@ async function loadCollection() {
         const border = item.equipped ? 'var(--win)' : (item.owned ? rarityCss[item.rarity] : '#333');
         const opacity = item.owned ? '1' : '0.25';
         const handler = item.owned ? `onclick="equipCollectionItem('${item.id}')"` : '';
+        const rarityClass = item.owned ? `rarity-${item.rarity}` : '';
+        const eqRing = item.equipped ? 'outline:2px solid var(--win);outline-offset:2px;' : '';
         html += `<div ${handler} style="text-align:center;cursor:${item.owned ? 'pointer' : 'default'};opacity:${opacity};" title="${escapeHtml(item.name)} (${item.rarity_name})">
-          <div style="width:52px;height:52px;margin:0 auto;border-radius:10px;background:var(--panel2);border:2px solid ${border};display:flex;align-items:center;justify-content:center;font-size:24px;">${item.type_icon}</div>
-          <div style="font-size:9px;color:${rarityCss[item.rarity]};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px;">${item.level}</div>
+          <div class="${rarityClass}" style="width:52px;height:52px;margin:0 auto;border-radius:12px;background:linear-gradient(155deg,rgba(255,255,255,0.04),rgba(0,0,0,0.2));display:flex;align-items:center;justify-content:center;font-size:26px;transition:transform .15s;${eqRing}">${item.type_icon}</div>
+          <div style="font-size:10px;color:${rarityCss[item.rarity]};margin-top:3px;font-weight:700;font-family:var(--font-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px;">ур.${item.level}</div>
         </div>`;
       }
       html += '</div></div>';
@@ -5687,14 +6197,28 @@ function onMatchFinished(msg) {
   };
   if (ws && ws.readyState === WebSocket.OPEN) ws.close();
   showScreen('finished');
-  // VFX при победе
+  // Number-ticker для финального счёта
+  const finEl = $('fin-score');
+  if (finEl) {
+    finEl.innerHTML = `<span id="fin-a" class="num-tick">0</span> : <span id="fin-b" class="num-tick">0</span>`;
+    setTimeout(() => { juiceTick($('fin-a'), 0, myRounds, 900); juiceTick($('fin-b'), 0, oppRounds, 900); }, 300);
+  }
+  // Juice при любом исходе (но разной силы)
   if (won) {
-    // Экипированный эффект загружаем из shop/vfx
+    juiceShake(document.body, 'lg');
+    setTimeout(() => juiceConfetti('victory'), 200);
+    hap('success');
+    // Экипированный эффект
     API.get('/api/shop/vfx').then(r => {
       const eq = (r.vfx || []).find(v => v.equipped);
       if (eq) playVictoryVfx(eq.id);
-      else playVictoryVfx('confetti');  // дефолт для всех
-    }).catch(() => playVictoryVfx('confetti'));
+    }).catch(() => {});
+  } else if (msg.winner === null) {
+    juiceShake(document.body, 'sm');
+    hap('tap');
+  } else {
+    juiceShake(document.body, 'sm');
+    hap('error');
   }
 }
 
