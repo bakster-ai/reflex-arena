@@ -292,6 +292,41 @@ GAMES = {
         "min_elapsed_ms": 19500,
         "max_elapsed_ms": 21000,
     },
+    "simon": {
+        "name": "Саймон говорит",
+        "desc": "Запомни и повтори последовательность цветов. Каждый раунд длиннее. 60 сек.",
+        "max_score": 15,
+        "min_elapsed_ms": 5000,
+        "max_elapsed_ms": 62000,
+    },
+    "go_nogo": {
+        "name": "Go / No-Go",
+        "desc": "Тапай только на ЗЕЛЁНЫЙ круг, на красный — не тапай. 20 сек.",
+        "max_score": 30,
+        "min_elapsed_ms": 19500,
+        "max_elapsed_ms": 21000,
+    },
+    "laser_maze": {
+        "name": "Лазерный лабиринт",
+        "desc": "Проведи точку от старта к финишу не касаясь стен. Таймер — чем быстрее, тем больше очков. 30 сек.",
+        "max_score": 20,
+        "min_elapsed_ms": 3000,
+        "max_elapsed_ms": 32000,
+    },
+    "memory_matrix": {
+        "name": "Матрица памяти",
+        "desc": "Клетки на сетке подсветились на секунду — повтори их. Каждый раунд +1 клетка. 60 сек.",
+        "max_score": 12,
+        "min_elapsed_ms": 5000,
+        "max_elapsed_ms": 62000,
+    },
+    "einstein": {
+        "name": "Логика Эйнштейна",
+        "desc": "Малая версия логической головоломки: из подсказок выведи правильный ответ. 45 сек.",
+        "max_score": 8,
+        "min_elapsed_ms": 5000,
+        "max_elapsed_ms": 47000,
+    },
 }
 GAME_POOL = list(GAMES.keys())
 K_FACTOR = 32
@@ -301,12 +336,16 @@ BASE_ELO = 1000.0
 GAME_CATEGORIES = {
     # 🔴 Реакция
     "react": "reaction", "aim": "reaction", "odd": "reaction", "reaction_grid": "reaction",
+    "go_nogo": "reaction",
     # 🟡 Логика
     "math": "logic", "sequence": "logic", "stroop": "logic", "number_chain": "logic", "count_dots": "logic",
+    "einstein": "logic",
     # 🟢 Память
     "memory": "memory", "spatial": "memory", "visual_memory": "memory", "word_memory": "memory",
+    "simon": "memory", "memory_matrix": "memory",
     # 🔵 Координация
     "balance": "coordination", "rhythm": "coordination", "quick_draw": "coordination", "typing": "coordination",
+    "laser_maze": "coordination",
     # 🟣 Эрудиция
     "flags_rain": "trivia", "sort_zones": "trivia", "map_tap": "trivia", "timeline": "trivia",
 }
@@ -330,6 +369,8 @@ AI_PROFILES = {
         "typing": (4, 2), "rhythm": (10, 3), "balance": (2, 1), "quick_draw": (5, 2),
         "flags_rain": (4, 2), "sort_zones": (8, 3), "map_tap": (4, 2), "timeline": (2, 1),
         "reaction_grid": (8, 3), "count_dots": (5, 2),
+        "simon": (3, 1), "go_nogo": (10, 3), "laser_maze": (4, 2),
+        "memory_matrix": (3, 1), "einstein": (2, 1),
         "elo": 800, "nickname": "🤖 AI Новичок",
         "elapsed_factor": 0.9,
     },
@@ -340,6 +381,8 @@ AI_PROFILES = {
         "typing": (9, 2), "rhythm": (22, 4), "balance": (5, 2), "quick_draw": (12, 3),
         "flags_rain": (10, 3), "sort_zones": (18, 4), "map_tap": (9, 3), "timeline": (6, 2),
         "reaction_grid": (22, 4), "count_dots": (12, 3),
+        "simon": (6, 1), "go_nogo": (20, 3), "laser_maze": (10, 2),
+        "memory_matrix": (6, 1), "einstein": (4, 1),
         "elo": 1000, "nickname": "🤖 AI Средний",
         "elapsed_factor": 1.0,
     },
@@ -350,6 +393,8 @@ AI_PROFILES = {
         "typing": (15, 3), "rhythm": (35, 4), "balance": (10, 2), "quick_draw": (18, 3),
         "flags_rain": (18, 3), "sort_zones": (28, 4), "map_tap": (14, 3), "timeline": (10, 2),
         "reaction_grid": (35, 4), "count_dots": (20, 3),
+        "simon": (10, 1), "go_nogo": (28, 2), "laser_maze": (16, 2),
+        "memory_matrix": (10, 1), "einstein": (7, 1),
         "elo": 1300, "nickname": "🤖 AI Мастер",
         "elapsed_factor": 1.0,
     },
@@ -810,9 +855,10 @@ class ReflexRoom:
                 # Категории игр этого матча — для применения бустов
                 cats_in_match = list({GAME_CATEGORIES.get(r.get("game")) for r in self.rounds_log if GAME_CATEGORIES.get(r.get("game"))})
                 try:
-                    from routes.api import apply_coin_boost
+                    from routes.api import apply_coin_boost, _bump_club_stats
                 except Exception:
                     apply_coin_boost = None
+                    _bump_club_stats = None
                 def _boost(pid, base):
                     if apply_coin_boost is None or base <= 0:
                         return base
@@ -824,12 +870,25 @@ class ReflexRoom:
                 if winner_role == "p1":
                     p1.coins = (p1.coins or 0) + pot + _boost(p1.id, 20)
                     p1.xp = (p1.xp or 0) + 15
+                    # Малая прокачка гемов — 1 за каждый 5-й матч (анти-спам через match_id)
+                    if self.match_db_id and self.match_db_id % 5 == 0:
+                        p1.gems = (p1.gems or 0) + 1
                 elif winner_role == "p2":
                     p2.coins = (p2.coins or 0) + pot + _boost(p2.id, 20)
                     p2.xp = (p2.xp or 0) + 15
+                    if self.match_db_id and self.match_db_id % 5 == 0:
+                        p2.gems = (p2.gems or 0) + 1
                 else:
                     p1.coins = (p1.coins or 0) + self.stake
                     p2.coins = (p2.coins or 0) + self.stake
+
+                # Обновить статы клубов
+                if _bump_club_stats is not None:
+                    try:
+                        _bump_club_stats(db, p1.id, winner_role == "p1")
+                        _bump_club_stats(db, p2.id, winner_role == "p2")
+                    except Exception as e:
+                        print(f"[club stats] {e}")
 
                 # Дневные задачи — для обоих игроков
                 unique_games = len({r.get("game") for r in self.rounds_log if r.get("game")})

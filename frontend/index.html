@@ -1297,6 +1297,7 @@
   <div class="right" id="top-right">
     <span class="chip elo">ELO: <span id="top-elo">—</span></span>
     <span class="chip coins">💰 <span id="top-coins">—</span></span>
+    <span class="chip" id="top-gems-chip" style="background:rgba(167,139,250,0.15);border:1px solid #a78bfa;color:#c7b2ff;">💎 <span id="top-gems">0</span></span>
     <span id="top-nick" style="font-weight: 700; display: none;"></span>
     <!-- Кнопка-меню профиля (для залогиненных) -->
     <button id="top-profile-btn" onclick="toggleProfileMenu()" style="display:none;background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;">👤</button>
@@ -1316,6 +1317,7 @@
   <button onclick="openClaimModal();closeProfileMenu();" id="pm-save-btn" style="width:100%;padding:10px;background:transparent;border:none;color:var(--win);text-align:left;border-radius:6px;cursor:pointer;font-size:14px;display:none;">💾 Сохранить аккаунт</button>
   <button onclick="openAuthModal('login');closeProfileMenu();" id="pm-switch-btn" style="width:100%;padding:10px;background:transparent;border:none;color:var(--accent);text-align:left;border-radius:6px;cursor:pointer;font-size:14px;display:none;">🔑 Войти в аккаунт</button>
   <button onclick="doLogout();closeProfileMenu();" id="pm-logout-btn" style="width:100%;padding:10px;background:transparent;border:none;color:var(--lose);text-align:left;border-radius:6px;cursor:pointer;font-size:14px;display:none;">🚪 Выйти</button>
+  <button onclick="toggleLocale();closeProfileMenu();" id="pm-locale-btn" style="width:100%;padding:10px;background:transparent;border:none;color:var(--text);text-align:left;border-radius:6px;cursor:pointer;font-size:14px;">🌐 RU / EN</button>
 </div>
 
 <!-- Модалка логина/регистрации (поверх любого экрана) -->
@@ -1519,6 +1521,19 @@
     <div data-tab-content="shop">
       <div class="tab-head"><h2>🛒 Магазин</h2></div>
       <div class="lobby">
+        <div class="panel" id="gem-shop-panel">
+          <h3>Гемы 💎 <span id="gem-balance" style="color:var(--accent2);font-weight:400;font-size:13px;"></span></h3>
+          <div style="color:var(--muted);font-size:12px;margin-bottom:10px;">Премиум-валюта. Покупай пакеты через Telegram Stars или трать на ускорители.</div>
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Купить гемы</div>
+            <div id="gem-packs" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;"></div>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Потратить гемы</div>
+            <div id="gem-spend" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;"></div>
+          </div>
+        </div>
+
         <div class="panel">
           <h3>Кейсы 📦</h3>
           <div style="color:var(--muted);font-size:12px;margin-bottom:10px;">Открой кейс — получи предмет в коллекцию. Дубликат = монеты.</div>
@@ -1582,6 +1597,19 @@
               <tbody id="lb-body"></tbody>
             </table>
           </div>
+        </div>
+
+        <div class="panel">
+          <h3>🏰 Клубы</h3>
+          <div style="color:var(--muted);font-size:12px;margin-bottom:10px;">Создай клуб или вступи в существующий. Получай бонусы, соревнуйся в клановом рейтинге.</div>
+          <div id="clubs-my-block" style="margin-bottom:12px;"></div>
+          <div id="clubs-top" style="display:grid;gap:6px;"></div>
+          <button id="clubs-create-btn" class="stake-btn" style="margin-top:10px;width:100%;padding:10px;" onclick="openCreateClubModal()">+ Создать клуб (2000 💰)</button>
+        </div>
+
+        <div class="panel">
+          <h3>🏟️ Турнир недели</h3>
+          <div id="tournament-block"><div style="color:var(--muted);font-size:13px;">Загрузка...</div></div>
         </div>
       </div>
     </div>
@@ -1800,7 +1828,10 @@ function switchTab(tab, opts = {}) {
     loadCategoryElo(); loadDailyTasks(); loadCollection(); loadAchievements(); loadFriends(); loadTitles();
   }
   if (tab === 'shop') {
-    loadCases(); loadShopThemes(); loadShopVfx(); loadShopAvatars(); loadReferralInfo();
+    loadCases(); loadShopThemes(); loadShopVfx(); loadShopAvatars(); loadReferralInfo(); loadGemShop();
+  }
+  if (tab === 'lb') {
+    loadClubs(); loadTournament();
   }
   if (tab === 'home') {
     loadBattlePass(); loadDailyChallenge(); loadStreak(); loadActivityFeed(); loadWeeklyEvent(); loadBoostInfo();
@@ -2094,6 +2125,7 @@ function renderTop() {
   const l = getLeague(elo);
   $('top-nick').textContent = nick;
   $('top-coins').textContent = ME.coins ?? 0;
+  const gemEl = $('top-gems'); if (gemEl) gemEl.textContent = ME.gems ?? 0;
   $('top-elo').innerHTML = `${l.icon} ${Math.round(elo)}`;
   $('top-elo').style.color = l.color;
 
@@ -2325,7 +2357,7 @@ function playDailyChallenge(game) {
   cleanupGame();
   $('game-area').innerHTML = `
     <div class="game-intro">
-      <div class="game-name">${escapeHtml({aim:'Снайпер',math:'Устный счёт',odd:'Найди отличие',typing:'Скорость печати',stroop:'Строп-тест',memory:'Память',spatial:'Пространственная память',rhythm:'Ритм',balance:'Гольф',quick_draw:'Быстрый штрих',number_chain:'Числовая цепочка',visual_memory:'Визуальная память',word_memory:'Слова',flags_rain:'Поймай флаг',sort_zones:'Сортировка',map_tap:'Карта мира',timeline:'Хронология',reaction_grid:'Сетка',count_dots:'Счёт точек'}[game] || game)}</div>
+      <div class="game-name">${escapeHtml({aim:'Снайпер',math:'Устный счёт',odd:'Найди отличие',typing:'Скорость печати',stroop:'Строп-тест',memory:'Память',spatial:'Пространственная память',rhythm:'Ритм',balance:'Гольф',quick_draw:'Быстрый штрих',number_chain:'Числовая цепочка',visual_memory:'Визуальная память',word_memory:'Слова',flags_rain:'Поймай флаг',sort_zones:'Сортировка',map_tap:'Карта мира',timeline:'Хронология',reaction_grid:'Сетка',count_dots:'Счёт точек',simon:'Саймон говорит',go_nogo:'Go / No-Go',laser_maze:'Лазерный лабиринт',memory_matrix:'Матрица памяти',einstein:'Логика Эйнштейна'}[game] || game)}</div>
       <div class="game-desc">Набери максимум очков. Твой лучший результат дня попадёт в топ.</div>
       <div class="countdown" id="cd">3</div>
     </div>
@@ -3327,6 +3359,472 @@ function startCountDotsGame() {
   return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
 }
 
+// ─── Саймон говорит ───
+function startSimonGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="math-area" id="sim" style="overflow:hidden;">
+      <div class="math-hud">🎼 Уровень <span id="sim-lvl">1</span> • <span id="sim-time">60.0</span>s</div>
+      <div id="sim-status" style="margin-top:40px;font-size:18px;font-weight:700;color:var(--accent2);">Смотри...</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;width:260px;margin-top:20px;">
+        <div class="sim-btn" data-c="0" style="background:#ef4444;aspect-ratio:1;border-radius:14px;transition:filter .1s;"></div>
+        <div class="sim-btn" data-c="1" style="background:#22c55e;aspect-ratio:1;border-radius:14px;transition:filter .1s;"></div>
+        <div class="sim-btn" data-c="2" style="background:#3b82f6;aspect-ratio:1;border-radius:14px;transition:filter .1s;"></div>
+        <div class="sim-btn" data-c="3" style="background:#eab308;aspect-ratio:1;border-radius:14px;transition:filter .1s;"></div>
+      </div>
+    </div>
+  `;
+  const DURATION = 60000;
+  const t0 = performance.now();
+  let finished = false, rafId = null;
+  let level = 0, seq = [], userIdx = 0, playing = false;
+  const status = () => $('sim-status');
+
+  function flash(c) {
+    const el = document.querySelector(`.sim-btn[data-c="${c}"]`);
+    if (!el) return;
+    el.style.filter = 'brightness(2.0)';
+    setTimeout(() => { el.style.filter = ''; }, 300);
+  }
+
+  async function playSeq() {
+    playing = false;
+    status().textContent = 'Смотри...';
+    for (let i = 0; i < seq.length; i++) {
+      if (finished) return;
+      flash(seq[i]);
+      await new Promise(r => setTimeout(r, 480));
+    }
+    if (finished) return;
+    playing = true;
+    userIdx = 0;
+    status().textContent = 'Повтори!';
+  }
+
+  function nextRound() {
+    level++;
+    $('sim-lvl').textContent = level;
+    seq.push(Math.floor(Math.random() * 4));
+    setTimeout(playSeq, 400);
+  }
+
+  document.querySelectorAll('.sim-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!playing || finished) return;
+      const c = parseInt(btn.dataset.c);
+      flash(c);
+      if (c !== seq[userIdx]) {
+        finished = true;
+        cancelAnimationFrame(rafId);
+        hap('error');
+        sendResult(level - 1, performance.now() - t0);
+        $('sim').innerHTML = `<div style="text-align:center;color:white;padding-top:40px;"><div style="font-size:56px;font-weight:800;">${level - 1}</div><div style="color:var(--muted);margin-top:6px;">Уровень достигнут</div></div>`;
+        return;
+      }
+      userIdx++;
+      if (userIdx >= seq.length) {
+        playing = false;
+        hap('success');
+        nextRound();
+      }
+    });
+  });
+
+  function loop(now) {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (now - t0));
+    $('sim-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true;
+      cancelAnimationFrame(rafId);
+      sendResult(level, now - t0);
+      $('sim').innerHTML = `<div style="text-align:center;color:white;padding-top:40px;"><div style="font-size:56px;font-weight:800;">${level}</div><div style="color:var(--muted);margin-top:6px;">Время вышло</div></div>`;
+      return;
+    }
+    rafId = requestAnimationFrame(loop);
+  }
+  nextRound();
+  rafId = requestAnimationFrame(loop);
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
+}
+
+// ─── Go / No-Go: тапай только зелёный, на красный не тапай ───
+function startGoNoGoGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="math-area" id="gng" style="overflow:hidden;">
+      <div class="math-hud">🟢 <span id="gng-correct">0</span> ✓ • <span id="gng-wrong">0</span> ✗ • <span id="gng-time">20.0</span>s</div>
+      <div id="gng-field" style="position:absolute;top:60px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;"></div>
+    </div>
+  `;
+  const DURATION = 20000;
+  const t0 = performance.now();
+  let correct = 0, wrong = 0, finished = false, rafId = null;
+  let shown = null, shownAt = 0, cooldown = 0;
+  const field = $('gng-field');
+
+  function showCircle() {
+    const isGreen = Math.random() < 0.7;
+    shown = { color: isGreen ? '#22c55e' : '#ef4444', isGo: isGreen, tapped: false };
+    field.innerHTML = `<div id="gng-circle" style="width:140px;height:140px;border-radius:50%;background:${shown.color};box-shadow:0 0 40px ${shown.color};cursor:pointer;transition:transform .1s;"></div>`;
+    shownAt = performance.now();
+    $('gng-circle').addEventListener('click', () => {
+      if (!shown || finished || shown.tapped) return;
+      shown.tapped = true;
+      if (shown.isGo) {
+        correct++; $('gng-correct').textContent = correct; hap('success');
+        $('gng-circle').style.filter = 'brightness(1.5)';
+      } else {
+        wrong++; $('gng-wrong').textContent = wrong; hap('error');
+        $('gng-circle').style.filter = 'grayscale(1)';
+      }
+      cooldown = 200;
+      setTimeout(() => { if (!finished) { field.innerHTML = ''; shown = null; } }, 200);
+    });
+    // Если No-Go и игрок не тапнул за 900мс — плюсуем
+    setTimeout(() => {
+      if (shown && !shown.tapped && !finished) {
+        if (!shown.isGo) { correct++; $('gng-correct').textContent = correct; hap('tap'); }
+        else { wrong++; $('gng-wrong').textContent = wrong; } // проспал go
+        field.innerHTML = ''; shown = null; cooldown = 150;
+      }
+    }, 900);
+  }
+
+  function loop(now) {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (now - t0));
+    $('gng-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true; cancelAnimationFrame(rafId);
+      const score = correct - wrong;
+      sendResult(score, now - t0);
+      $('gng').innerHTML = `<div style="text-align:center;color:white;padding-top:40px;"><div style="font-size:56px;font-weight:800;">${score}</div><div style="color:var(--muted);margin-top:6px;">${correct} верно, ${wrong} ошибок</div></div>`;
+      return;
+    }
+    if (!shown && cooldown <= 0) showCircle();
+    if (cooldown > 0) cooldown -= 16;
+    rafId = requestAnimationFrame(loop);
+  }
+  rafId = requestAnimationFrame(loop);
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
+}
+
+// ─── Лазерный лабиринт: веди точку от старта к финишу не касаясь стен ───
+function startLaserMazeGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="math-area" id="lm" style="overflow:hidden;">
+      <div class="math-hud">🟡 Уровень <span id="lm-lvl">1</span> • <span id="lm-time">30.0</span>s</div>
+      <div id="lm-field" style="position:absolute;top:56px;left:8px;right:8px;bottom:8px;background:var(--panel2);border:2px solid var(--border);border-radius:12px;overflow:hidden;touch-action:none;"></div>
+    </div>
+  `;
+  const DURATION = 30000;
+  const t0 = performance.now();
+  let finished = false, rafId = null;
+  let level = 1, dragging = false, score = 0;
+  const field = $('lm-field');
+
+  function genMaze() {
+    const r = field.getBoundingClientRect();
+    const W = r.width, H = r.height;
+    if (W < 50 || H < 50) { setTimeout(genMaze, 100); return; }
+    field.innerHTML = '';
+    // Стены — вертикальные столбцы с разрывами
+    const cols = 3 + level;  // больше препятствий
+    const colW = W / (cols + 1);
+    for (let i = 1; i <= cols; i++) {
+      const gapY = 20 + Math.random() * (H - 90);
+      const topPart = document.createElement('div');
+      topPart.style.cssText = `position:absolute;left:${i*colW - 3}px;top:0;width:6px;height:${gapY}px;background:#ff4d6d;box-shadow:0 0 8px #ff4d6d;border-radius:3px;`;
+      topPart.dataset.wall = '1';
+      const botPart = document.createElement('div');
+      botPart.style.cssText = `position:absolute;left:${i*colW - 3}px;top:${gapY + 60}px;width:6px;height:${H - gapY - 60}px;background:#ff4d6d;box-shadow:0 0 8px #ff4d6d;border-radius:3px;`;
+      botPart.dataset.wall = '1';
+      field.appendChild(topPart); field.appendChild(botPart);
+    }
+    // Старт + финиш
+    const start = document.createElement('div');
+    start.style.cssText = `position:absolute;left:6px;top:${H/2 - 16}px;width:28px;height:28px;border-radius:50%;background:#26d67f;z-index:1;`;
+    const end = document.createElement('div');
+    end.style.cssText = `position:absolute;right:6px;top:${H/2 - 16}px;width:28px;height:28px;border-radius:50%;background:#ffd740;z-index:1;`;
+    end.dataset.end = '1';
+    field.appendChild(start); field.appendChild(end);
+    // Курсор
+    const cur = document.createElement('div');
+    cur.id = 'lm-cursor';
+    cur.style.cssText = `position:absolute;left:14px;top:${H/2 - 7}px;width:14px;height:14px;border-radius:50%;background:#7dd3fc;box-shadow:0 0 12px #7dd3fc;z-index:3;pointer-events:none;`;
+    field.appendChild(cur);
+    dragging = false;
+  }
+
+  function touchPt(e) {
+    const r = field.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: t.clientX - r.left, y: t.clientY - r.top };
+  }
+  function collidesWall(x, y) {
+    const walls = field.querySelectorAll('[data-wall]');
+    for (const w of walls) {
+      const wr = { x: parseFloat(w.style.left), y: parseFloat(w.style.top), w: parseFloat(w.style.width), h: parseFloat(w.style.height) };
+      if (x > wr.x - 6 && x < wr.x + wr.w + 6 && y > wr.y - 6 && y < wr.y + wr.h + 6) return true;
+    }
+    return false;
+  }
+  function reachedEnd(x, y) {
+    const e = field.querySelector('[data-end]');
+    if (!e) return false;
+    const er = { x: parseFloat(e.style.right || '6'), y: parseFloat(e.style.top) };
+    const fr = field.getBoundingClientRect();
+    const endX = fr.width - er.x - 14;
+    return Math.hypot(x - endX, y - (er.y + 14)) < 22;
+  }
+  function fail() {
+    const cur = document.getElementById('lm-cursor');
+    if (cur) cur.style.background = '#ff4d6d';
+    hap('error');
+    dragging = false;
+    setTimeout(genMaze, 400);
+  }
+  function win() {
+    score += level;
+    level++;
+    $('lm-lvl').textContent = level;
+    hap('success');
+    genMaze();
+  }
+
+  field.addEventListener('touchstart', (e) => {
+    const p = touchPt(e);
+    if (p.x < 30 && p.y > (field.getBoundingClientRect().height / 2 - 22) && p.y < (field.getBoundingClientRect().height / 2 + 22)) {
+      dragging = true;
+      e.preventDefault();
+    }
+  }, { passive: false });
+  field.addEventListener('mousedown', (e) => {
+    const p = touchPt(e);
+    if (p.x < 30 && p.y > (field.getBoundingClientRect().height / 2 - 22) && p.y < (field.getBoundingClientRect().height / 2 + 22)) {
+      dragging = true;
+    }
+  });
+  field.addEventListener('touchmove', (e) => {
+    if (!dragging || finished) return;
+    const p = touchPt(e);
+    const cur = document.getElementById('lm-cursor');
+    if (cur) { cur.style.left = (p.x - 7) + 'px'; cur.style.top = (p.y - 7) + 'px'; }
+    if (collidesWall(p.x, p.y)) { fail(); return; }
+    if (reachedEnd(p.x, p.y)) win();
+    e.preventDefault();
+  }, { passive: false });
+  field.addEventListener('mousemove', (e) => {
+    if (!dragging || finished) return;
+    const p = touchPt(e);
+    const cur = document.getElementById('lm-cursor');
+    if (cur) { cur.style.left = (p.x - 7) + 'px'; cur.style.top = (p.y - 7) + 'px'; }
+    if (collidesWall(p.x, p.y)) { fail(); return; }
+    if (reachedEnd(p.x, p.y)) win();
+  });
+  const endDrag = () => { dragging = false; };
+  field.addEventListener('touchend', endDrag);
+  field.addEventListener('mouseup', endDrag);
+  field.addEventListener('mouseleave', endDrag);
+
+  function loop(now) {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (now - t0));
+    $('lm-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true; cancelAnimationFrame(rafId);
+      sendResult(score, now - t0);
+      $('lm').innerHTML = `<div style="text-align:center;color:white;padding-top:40px;"><div style="font-size:56px;font-weight:800;">${score}</div><div style="color:var(--muted);margin-top:6px;">Уровень ${level}</div></div>`;
+      return;
+    }
+    rafId = requestAnimationFrame(loop);
+  }
+  setTimeout(genMaze, 50);
+  rafId = requestAnimationFrame(loop);
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
+}
+
+// ─── Матрица памяти: сетка N×N, подсвечены K клеток, повтори ───
+function startMemoryMatrixGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="math-area" id="mm" style="overflow:hidden;">
+      <div class="math-hud">🧩 Уровень <span id="mm-lvl">1</span> • <span id="mm-time">60.0</span>s</div>
+      <div id="mm-status" style="margin-top:20px;font-weight:700;color:var(--accent2);">Запоминай...</div>
+      <div id="mm-grid" style="display:grid;gap:6px;margin-top:18px;"></div>
+    </div>
+  `;
+  const DURATION = 60000;
+  const t0 = performance.now();
+  let finished = false, rafId = null;
+  let level = 1, cells = [], userPicks = new Set(), memorize = false;
+
+  function startRound() {
+    const n = Math.min(6, 3 + Math.floor(level / 3));  // 3..6 размер
+    const k = Math.min(n * n - 1, 2 + level);  // кол-во подсвеченных
+    const grid = $('mm-grid');
+    grid.style.gridTemplateColumns = `repeat(${n}, 44px)`;
+    grid.innerHTML = '';
+    cells = [];
+    userPicks = new Set();
+    const marked = new Set();
+    while (marked.size < k) marked.add(Math.floor(Math.random() * n * n));
+    for (let i = 0; i < n * n; i++) {
+      const d = document.createElement('div');
+      d.style.cssText = 'width:44px;height:44px;background:var(--panel2);border:1.5px solid var(--border);border-radius:8px;cursor:pointer;';
+      d.dataset.i = i;
+      d.dataset.mark = marked.has(i) ? '1' : '0';
+      grid.appendChild(d);
+      cells.push(d);
+    }
+    memorize = true;
+    $('mm-status').textContent = 'Запоминай...';
+    // Подсветка
+    cells.forEach(c => { if (c.dataset.mark === '1') c.style.background = 'var(--accent)'; });
+    setTimeout(() => {
+      if (finished) return;
+      cells.forEach(c => { c.style.background = 'var(--panel2)'; });
+      memorize = false;
+      $('mm-status').textContent = 'Тапни помеченные';
+      cells.forEach(c => {
+        c.addEventListener('click', () => onTap(c), { once: true });
+      });
+    }, Math.max(800, 1800 - level * 100));
+  }
+
+  function onTap(c) {
+    if (finished || memorize) return;
+    const i = parseInt(c.dataset.i);
+    const correct = c.dataset.mark === '1';
+    if (correct) {
+      c.style.background = 'var(--win)';
+      userPicks.add(i);
+      const totalMarked = cells.filter(x => x.dataset.mark === '1').length;
+      if (userPicks.size >= totalMarked) {
+        level++;
+        $('mm-lvl').textContent = level;
+        hap('success');
+        setTimeout(startRound, 500);
+      }
+    } else {
+      c.style.background = 'var(--lose)';
+      hap('error');
+      finished = true;
+      cancelAnimationFrame(rafId);
+      sendResult(level - 1, performance.now() - t0);
+      $('mm').innerHTML = `<div style="text-align:center;color:white;padding-top:40px;"><div style="font-size:56px;font-weight:800;">${level - 1}</div><div style="color:var(--muted);margin-top:6px;">Уровень достигнут</div></div>`;
+    }
+  }
+
+  function loop(now) {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (now - t0));
+    $('mm-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true; cancelAnimationFrame(rafId);
+      sendResult(level, now - t0);
+      $('mm').innerHTML = `<div style="text-align:center;color:white;padding-top:40px;"><div style="font-size:56px;font-weight:800;">${level}</div><div style="color:var(--muted);margin-top:6px;">Время вышло</div></div>`;
+      return;
+    }
+    rafId = requestAnimationFrame(loop);
+  }
+  startRound();
+  rafId = requestAnimationFrame(loop);
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
+}
+
+// ─── Логика Эйнштейна: мини-версия ───
+const EINSTEIN_PUZZLES = [
+  // Формат: 4 вопроса, для каждого — объекты, подсказки, правильный ответ
+  { q: 'Кто пьёт молоко?', opts: ['Англичанин','Швед','Датчанин','Немец'],
+    hints: ['Англичанин живёт в красном доме', 'Красный дом стоит в центре', 'В центре пьют молоко'], ans: 'Англичанин' },
+  { q: 'Чей дом синий?', opts: ['Норвежец','Датчанин','Швед','Немец'],
+    hints: ['Норвежец живёт 1-м слева', 'Синий дом 2-й слева', 'Норвежец сосед синего дома'], ans: 'Датчанин' },
+  { q: 'Какая собака у немца?', opts: ['Бульдог','Пудель','Такса','Колли'],
+    hints: ['Немец курит Ротманс', 'Курильщик Ротманса держит таксу'], ans: 'Такса' },
+  { q: 'Кто выиграл гонку?', opts: ['Аня','Боб','Катя','Дима'],
+    hints: ['Аня финишировала до Кати', 'Боб был последним', 'Дима — сразу за Аней'], ans: 'Аня' },
+  { q: 'Какого цвета шар Ани?', opts: ['Синий','Красный','Зелёный','Жёлтый'],
+    hints: ['У Ани не красный шар', 'Синий — у того кто выше', 'Аня выше всех'], ans: 'Синий' },
+  { q: 'Кто старше всех?', opts: ['Алёша','Борис','Вика','Гена'],
+    hints: ['Алёша младше Бориса', 'Вика младше Гены', 'Борис младше Гены'], ans: 'Гена' },
+  { q: 'Где лежит ключ?', opts: ['В ящике','На полке','Под ковром','В вазе'],
+    hints: ['Ключ не в комнате', 'Ковёр в гостиной', 'Ключ найден не в комнате'], ans: 'Под ковром' },
+  { q: 'Чья профессия — врач?', opts: ['Иван','Мария','Пётр','Ольга'],
+    hints: ['Иван — инженер', 'Пётр — учитель', 'Ольга не работает в медицине'], ans: 'Мария' },
+];
+
+function startEinsteinGame() {
+  const area = $('game-area');
+  area.innerHTML = `
+    <div class="math-area" id="ein" style="overflow:hidden;">
+      <div class="math-hud">🧠 <span id="ein-correct">0</span> ✓ • <span id="ein-wrong">0</span> ✗ • <span id="ein-time">45.0</span>s</div>
+      <div id="ein-q" style="margin-top:50px;font-size:17px;font-weight:700;text-align:center;padding:0 12px;">—</div>
+      <div id="ein-hints" style="margin-top:12px;padding:0 18px;color:var(--muted);font-size:13px;line-height:1.4;"></div>
+      <div id="ein-opts" class="math-options" style="grid-template-columns:1fr 1fr;margin-top:18px;width:90%;max-width:360px;margin-left:auto;margin-right:auto;"></div>
+    </div>
+  `;
+  const DURATION = 45000;
+  const t0 = performance.now();
+  let correct = 0, wrong = 0, finished = false, rafId = null, lock = false;
+  const usedIdx = new Set();
+
+  function next() {
+    if (finished) return;
+    lock = false;
+    let idx;
+    const avail = EINSTEIN_PUZZLES.map((_, i) => i).filter(i => !usedIdx.has(i));
+    if (avail.length === 0) usedIdx.clear();
+    const pool = avail.length > 0 ? avail : EINSTEIN_PUZZLES.map((_, i) => i);
+    idx = pool[Math.floor(Math.random() * pool.length)];
+    usedIdx.add(idx);
+    const p = EINSTEIN_PUZZLES[idx];
+    $('ein-q').textContent = p.q;
+    $('ein-hints').innerHTML = p.hints.map(h => `• ${escapeHtml(h)}`).join('<br>');
+    const opts = $('ein-opts');
+    try { document.activeElement && document.activeElement.blur && document.activeElement.blur(); } catch (_) {}
+    opts.innerHTML = '';
+    const shuf = p.opts.slice().sort(() => Math.random() - 0.5);
+    shuf.forEach(o => {
+      const b = document.createElement('button');
+      b.className = 'math-opt';
+      b.style.cssText = 'font-size:13px;padding:14px 10px;';
+      b.textContent = o;
+      b.addEventListener('click', () => {
+        if (lock || finished) return;
+        lock = true;
+        if (o === p.ans) {
+          correct++; $('ein-correct').textContent = correct; b.classList.add('correct'); hap('success');
+        } else {
+          wrong++; $('ein-wrong').textContent = wrong; b.classList.add('wrong'); hap('error');
+          opts.querySelectorAll('.math-opt').forEach(btn => { if (btn.textContent === p.ans) btn.classList.add('correct'); });
+        }
+        setTimeout(() => { if (!finished) next(); }, 650);
+      });
+      opts.appendChild(b);
+    });
+  }
+
+  function loop(now) {
+    if (finished) return;
+    const left = Math.max(0, DURATION - (now - t0));
+    $('ein-time').textContent = (left / 1000).toFixed(1);
+    if (left <= 0) {
+      finished = true; cancelAnimationFrame(rafId);
+      const score = correct - wrong;
+      sendResult(score, now - t0);
+      $('ein').innerHTML = `<div style="text-align:center;color:white;padding-top:40px;"><div style="font-size:56px;font-weight:800;">${score}</div><div style="color:var(--muted);margin-top:6px;">${correct} верно, ${wrong} ошибок</div></div>`;
+      return;
+    }
+    rafId = requestAnimationFrame(loop);
+  }
+  next();
+  rafId = requestAnimationFrame(loop);
+  return { cleanup: () => { finished = true; cancelAnimationFrame(rafId); } };
+}
+
 // ─── VFX ───
 function playVictoryVfx(kind) {
   const overlay = document.createElement('div');
@@ -3969,6 +4467,227 @@ async function loadReferralInfo() {
     $('ref-link').value = `${origin}/?ref=${encodeURIComponent(info.my_nickname)}`;
     $('ref-info').textContent = `Ты пригласил: ${info.invited_count} • бонус: ${info.bonus_per_invite}💰 за каждого`;
   } catch (e) {}
+}
+
+// ─── Магазин гемов ───
+async function loadGemShop() {
+  try {
+    const r = await API.get('/api/gems/shop');
+    const gEl = $('gem-balance'); if (gEl) gEl.textContent = `баланс ${ME && ME.gems || 0} 💎`;
+    const packsEl = $('gem-packs');
+    if (packsEl) {
+      packsEl.innerHTML = (r.buy_packs || []).map(p => {
+        const bonus = p.bonus_pct ? `<div style="color:var(--win);font-size:10px;font-weight:700;">+${p.bonus_pct}%</div>` : '';
+        return `
+          <div style="background:var(--panel2);border:1.5px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
+            <div style="font-size:18px;font-weight:800;color:var(--accent2);">${p.gems} 💎</div>
+            ${bonus}
+            <div style="font-size:11px;color:var(--muted);margin:4px 0;">${escapeHtml(p.name)}</div>
+            <button class="stake-btn selected" style="width:100%;padding:6px 8px;font-size:12px;" onclick="buyGemPack('${p.id}')">${p.price_stars} ⭐</button>
+          </div>
+        `;
+      }).join('');
+    }
+    const spEl = $('gem-spend');
+    if (spEl) {
+      spEl.innerHTML = (r.spend_items || []).map(i => `
+        <div style="background:var(--panel2);border:1.5px solid var(--border);border-radius:10px;padding:10px;">
+          <div style="font-size:20px;text-align:center;">${i.icon}</div>
+          <div style="font-size:12px;font-weight:700;text-align:center;margin:4px 0;">${escapeHtml(i.name)}</div>
+          <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:6px;min-height:28px;">${escapeHtml(i.desc)}</div>
+          <button class="stake-btn" style="width:100%;padding:6px;font-size:11px;" onclick="spendGems('${i.id}', ${i.price})">${i.price} 💎</button>
+        </div>
+      `).join('');
+    }
+  } catch (e) {}
+}
+
+async function buyGemPack(packId) {
+  const r = await API.post('/api/payments/create_invoice', { pack_id: packId });
+  if (!r.ok) { alert(r.msg || 'Ошибка создания платежа'); return; }
+  if (r.mode === 'tg_stars' && r.invoice_url) {
+    // Открыть Telegram invoice
+    location.href = r.invoice_url;
+    return;
+  }
+  // Dev-режим: подтверждаем сразу
+  if (confirm('Dev-режим: выдать гемы без реальной оплаты? (только для тестирования)')) {
+    const c = await API.post('/api/payments/dev_complete', { payment_id: r.payment_id });
+    if (c.ok) {
+      hap('success');
+      ME.gems = c.new_gems; renderTop();
+      alert(`+${c.gems_granted} 💎 выдано (dev)`);
+      loadGemShop();
+    } else {
+      alert(c.msg || 'Ошибка');
+    }
+  }
+}
+
+async function spendGems(itemId, price) {
+  if (!confirm(`Потратить ${price} 💎?`)) return;
+  const r = await API.post('/api/gems/spend', { item_id: itemId });
+  if (r.ok) {
+    hap('success');
+    ME.gems = r.new_gems; if (r.new_coins != null) ME.coins = r.new_coins; renderTop();
+    loadGemShop();
+    let msg = 'Готово!';
+    if (r.awarded) {
+      if (r.awarded.coins) msg = `+${r.awarded.coins} 💰`;
+      if (r.awarded.bp_premium) msg = 'Battle Pass Premium активирован!';
+      if (r.awarded.xp_boost_until) msg = '×2 XP на 24 часа';
+      if (r.awarded.next_case_rare) msg = 'Следующий кейс — гарантия Rare+';
+      if (r.awarded.case_tokens) msg = `+${r.awarded.case_tokens} бесплатных кейсов`;
+    }
+    alert(msg);
+  } else {
+    alert(r.msg || 'Ошибка');
+  }
+}
+
+// ─── Клубы ───
+async function loadClubs() {
+  try {
+    const mine = await API.get('/api/clubs/my');
+    const list = await API.get('/api/clubs/list?limit=20');
+    const myBlk = $('clubs-my-block');
+    if (myBlk) {
+      if (mine.in_club) {
+        const c = mine.club;
+        myBlk.innerHTML = `
+          <div style="background:var(--panel2);border:1.5px solid var(--accent);border-radius:12px;padding:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-weight:800;font-size:15px;">${c.icon} [${escapeHtml(c.tag)}] ${escapeHtml(c.name)}</div>
+                <div style="font-size:11px;color:var(--muted);">${c.member_count} чел. • рейтинг ${c.rating} • ${c.total_wins}/${c.total_matches}</div>
+              </div>
+              <button class="cancel-btn" style="padding:8px 14px;font-size:12px;" onclick="leaveClub()">Выйти</button>
+            </div>
+            ${c.description ? `<div style="font-size:12px;color:var(--muted);margin-top:6px;">${escapeHtml(c.description)}</div>` : ''}
+            <div style="margin-top:8px;">
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Состав</div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                ${(mine.members||[]).map(m => `<span style="font-size:11px;padding:3px 8px;background:var(--panel);border-radius:8px;">${m.role==='owner'?'👑 ':''}${escapeHtml(m.nickname)} <span style="color:var(--muted);">(${m.elo})</span></span>`).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+        $('clubs-create-btn').style.display = 'none';
+      } else {
+        myBlk.innerHTML = '';
+        $('clubs-create-btn').style.display = '';
+      }
+    }
+    const topEl = $('clubs-top');
+    if (topEl) {
+      topEl.innerHTML = `<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Топ клубов</div>` +
+        (list.clubs || []).slice(0, 10).map((c, i) => {
+          const joinBtn = mine.in_club ? '' :
+            `<button class="stake-btn" style="width:auto;padding:4px 10px;font-size:11px;" onclick="joinClub(${c.id})">Вступить</button>`;
+          return `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--panel2);border-radius:8px;">
+              <div>
+                <div style="font-size:13px;font-weight:700;">#${i + 1} ${c.icon} [${escapeHtml(c.tag)}] ${escapeHtml(c.name)}</div>
+                <div style="font-size:11px;color:var(--muted);">${c.member_count} чел. • рейтинг ${c.rating}</div>
+              </div>
+              ${joinBtn}
+            </div>
+          `;
+        }).join('');
+    }
+  } catch (e) {}
+}
+
+function openCreateClubModal() {
+  if (document.getElementById('club-create-overlay')) return;
+  const o = document.createElement('div');
+  o.id = 'club-create-overlay';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9500;padding:20px;padding-top:calc(env(safe-area-inset-top,0) + 20px);';
+  o.innerHTML = `
+    <div style="background:var(--panel);border:1.5px solid var(--accent);border-radius:18px;padding:22px;max-width:380px;width:100%;">
+      <div style="font-size:18px;font-weight:800;margin-bottom:12px;">Создать клуб</div>
+      <input id="cc-name" placeholder="Название (3-30)" style="width:100%;padding:10px;background:var(--panel2);border:1.5px solid var(--border);color:var(--text);border-radius:8px;margin-bottom:8px;" />
+      <input id="cc-tag" placeholder="Тег (2-5 букв)" maxlength="5" style="width:100%;padding:10px;background:var(--panel2);border:1.5px solid var(--border);color:var(--text);border-radius:8px;margin-bottom:8px;text-transform:uppercase;" />
+      <input id="cc-icon" placeholder="Иконка 🏰" value="🏰" style="width:100%;padding:10px;background:var(--panel2);border:1.5px solid var(--border);color:var(--text);border-radius:8px;margin-bottom:8px;" />
+      <textarea id="cc-desc" placeholder="Описание (макс 200 символов)" maxlength="200" style="width:100%;padding:10px;background:var(--panel2);border:1.5px solid var(--border);color:var(--text);border-radius:8px;margin-bottom:12px;min-height:60px;resize:vertical;"></textarea>
+      <div style="display:flex;gap:8px;">
+        <button class="cancel-btn" style="flex:1;" onclick="document.getElementById('club-create-overlay').remove()">Отмена</button>
+        <button class="stake-btn selected" style="flex:1;" onclick="createClub()">Создать</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(o);
+}
+
+async function createClub() {
+  const name = $('cc-name').value.trim();
+  const tag = $('cc-tag').value.trim().toUpperCase();
+  const icon = $('cc-icon').value.trim() || '🏰';
+  const desc = $('cc-desc').value.trim();
+  const r = await API.post('/api/clubs/create', { name, tag, icon, description: desc });
+  if (r.ok) {
+    hap('success');
+    ME.coins = r.new_coins; renderTop();
+    document.getElementById('club-create-overlay').remove();
+    loadClubs();
+  } else {
+    alert(r.msg || 'Ошибка');
+  }
+}
+
+async function joinClub(clubId) {
+  const r = await API.post('/api/clubs/join', { club_id: clubId });
+  if (r.ok) { hap('success'); loadClubs(); }
+  else alert(r.msg || 'Ошибка');
+}
+
+async function leaveClub() {
+  if (!confirm('Точно выйти из клуба?')) return;
+  const r = await API.post('/api/clubs/leave', {});
+  if (r.ok) { hap('tap'); loadClubs(); }
+}
+
+// ─── Турниры ───
+async function loadTournament() {
+  try {
+    const r = await API.get('/api/tournament/current');
+    const lb = await API.get('/api/tournament/leaderboard');
+    const blk = $('tournament-block');
+    if (!blk) return;
+    const signedUp = !!r.my_signup;
+    const signupBtn = signedUp
+      ? `<span style="color:var(--win);font-size:13px;font-weight:700;">✓ Ты зарегистрирован</span>`
+      : `<button class="stake-btn selected" style="padding:8px 16px;font-size:13px;" onclick="joinTournament()">Вступить — ${r.entry_coins} 💰</button>`;
+    const prizesHtml = Object.entries(r.prizes).map(([rank, p]) =>
+      `<div style="font-size:11px;color:var(--muted);">${rank}-е: ${p.coins} 💰 + ${p.gems} 💎</div>`
+    ).join('');
+    const topHtml = (lb.entries || []).slice(0, 8).map(e =>
+      `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;"><span>#${e.rank} ${escapeHtml(e.nickname)}</span><span style="font-weight:700;">${e.elo}</span></div>`
+    ).join('');
+    blk.innerHTML = `
+      <div style="margin-bottom:10px;">
+        <div style="font-weight:800;">Неделя ${escapeHtml(r.week_key)}</div>
+        <div style="font-size:11px;color:var(--muted);">${r.signups} участников • статус: ${r.status}</div>
+      </div>
+      <div style="margin-bottom:10px;">${signupBtn}</div>
+      <div style="margin-bottom:12px;padding:8px;background:var(--panel2);border-radius:8px;">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Призы</div>
+        ${prizesHtml}
+      </div>
+      ${topHtml ? `<div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Топ участников</div>${topHtml}</div>` : ''}
+    `;
+  } catch (e) {}
+}
+
+async function joinTournament() {
+  const r = await API.post('/api/tournament/signup', {});
+  if (r.ok) {
+    hap('success');
+    ME.coins = r.new_coins; renderTop();
+    loadTournament();
+  } else {
+    alert(r.msg || 'Ошибка');
+  }
 }
 
 function copyRefLink() {
@@ -4631,6 +5350,11 @@ function startMiniGame(gameId) {
   else if (gameId === 'timeline') currentGame = startTimelineGame();
   else if (gameId === 'reaction_grid') currentGame = startReactionGridGame();
   else if (gameId === 'count_dots') currentGame = startCountDotsGame();
+  else if (gameId === 'simon') currentGame = startSimonGame();
+  else if (gameId === 'go_nogo') currentGame = startGoNoGoGame();
+  else if (gameId === 'laser_maze') currentGame = startLaserMazeGame();
+  else if (gameId === 'memory_matrix') currentGame = startMemoryMatrixGame();
+  else if (gameId === 'einstein') currentGame = startEinsteinGame();
   else {
     // Неизвестная игра — возможно, старый кэш браузера. Показываем подсказку.
     console.error('Unknown mini-game:', gameId);
@@ -6135,13 +6859,78 @@ $('auth-nick').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('au
 })();
 
 // Themes are now applied via owned_themes purchase (see shop).
-// Applying saved theme on load:
 (function applyOwnedTheme() {
   try {
     const active = localStorage.getItem('ra_active_theme') || '';
     if (active) document.body.dataset.style = active;
   } catch (_) {}
 })();
+
+// ─── Базовая EN-локализация (переводим основные тексты по словарю) ───
+const I18N = {
+  'Играть': 'Play',
+  'Профиль': 'Profile',
+  'Магазин': 'Shop',
+  'Топ': 'Top',
+  'Главная': 'Home',
+  'Найти матч': 'Find Match',
+  'Создать комнату': 'Create Room',
+  'Практика с ботом 🤖': 'Bot Practice 🤖',
+  'Новичок': 'Easy',
+  'Средний': 'Medium',
+  'Мастер': 'Hard',
+  'Моя статистика': 'My Stats',
+  'Победы': 'Wins',
+  'Поражения': 'Losses',
+  'Рейтинги по категориям': 'Category Ratings',
+  'Коллекция 🎒': 'Collection 🎒',
+  'Достижения': 'Achievements',
+  'Задания на сегодня': 'Today\'s Quests',
+  'Друзья': 'Friends',
+  'Последние матчи': 'Recent Matches',
+  'Ежедневный стрик 🔥': 'Daily Streak 🔥',
+  'Событие недели 🌟': 'Weekly Event 🌟',
+  'Мои бусты ⚡': 'My Boosts ⚡',
+  'Испытание дня 🔥': 'Daily Challenge 🔥',
+  'Активность': 'Activity',
+  'Гемы 💎': 'Gems 💎',
+  'Кейсы 📦': 'Cases 📦',
+  'Магазин тем 🎨': 'Theme Shop 🎨',
+  'Аватары 🦊': 'Avatars 🦊',
+  'Купить гемы': 'Buy gems',
+  'Потратить гемы': 'Spend gems',
+  'Клубы': 'Clubs',
+  'Турнир недели': 'Weekly Tournament',
+  'Вступить': 'Join',
+  'Выйти': 'Leave',
+  'Отмена': 'Cancel',
+  'Создать': 'Create',
+  'Забрать': 'Claim',
+  'Играть →': 'Play →',
+};
+function applyLocale() {
+  const loc = localStorage.getItem('ra_locale') || 'ru';
+  if (loc !== 'en') { document.documentElement.lang = 'ru'; return; }
+  document.documentElement.lang = 'en';
+  // Текстовая замена: проходим по видимым текстовым нодам
+  try {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+    const toReplace = [];
+    let node;
+    while ((node = walker.nextNode())) {
+      const t = node.nodeValue.trim();
+      if (t && I18N[t]) toReplace.push(node);
+    }
+    toReplace.forEach(n => { n.nodeValue = n.nodeValue.replace(n.nodeValue.trim(), I18N[n.nodeValue.trim()]); });
+  } catch (_) {}
+}
+function toggleLocale() {
+  const cur = localStorage.getItem('ra_locale') || 'ru';
+  const nxt = cur === 'ru' ? 'en' : 'ru';
+  localStorage.setItem('ra_locale', nxt);
+  location.reload();  // простейший способ перерисовать всё
+}
+document.addEventListener('DOMContentLoaded', () => setTimeout(applyLocale, 100));
 </script>
 
 </body>

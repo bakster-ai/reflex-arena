@@ -22,6 +22,8 @@ from models.models import (
     Player, ReflexMatch, ReflexAchievement, ReflexDailyTask, ReflexDailyChallenge,
     ReflexFriend, ReflexSeason, ReflexPassProgress, ReflexSeasonReward,
     ReflexLoginStreak, ReflexEvent, ReflexPushSubscription,
+    ReflexClub, ReflexClubMember, ReflexTournament, ReflexTournamentSignup,
+    ReflexPayment,
 )
 from datetime import timedelta
 
@@ -142,6 +144,7 @@ DAILY_CHALLENGE_POOL = [
     "typing", "rhythm", "balance", "quick_draw",
     "flags_rain", "sort_zones", "map_tap", "timeline",
     "reaction_grid", "count_dots",
+    "simon", "go_nogo", "laser_maze", "memory_matrix", "einstein",
 ]
 
 # Anti-cheat границы (совпадают с GAMES в reflex_ws.py)
@@ -165,6 +168,11 @@ _DC_LIMITS = {
     "timeline": {"min_ms": 5000, "max_ms": 32000, "max_score": 15},
     "reaction_grid": {"min_ms": 19500, "max_ms": 21000, "max_score": 50},
     "count_dots": {"min_ms": 19500, "max_ms": 21000, "max_score": 30},
+    "simon": {"min_ms": 5000, "max_ms": 62000, "max_score": 15},
+    "go_nogo": {"min_ms": 19500, "max_ms": 21000, "max_score": 30},
+    "laser_maze": {"min_ms": 3000, "max_ms": 32000, "max_score": 20},
+    "memory_matrix": {"min_ms": 5000, "max_ms": 62000, "max_score": 12},
+    "einstein": {"min_ms": 5000, "max_ms": 47000, "max_score": 8},
 }
 
 
@@ -552,6 +560,7 @@ def me(authorization: Optional[str] = Header(None), db: Session = Depends(get_db
         "player_id": player.id,
         "nickname": player.nickname,
         "coins": player.coins or 0,
+        "gems": player.gems or 0,
         "elo": round(player.reflex_elo or 1000.0, 1),
         "wins": player.reflex_wins or 0,
         "losses": player.reflex_losses or 0,
@@ -2255,3 +2264,486 @@ def titles_equip(data: dict, authorization: Optional[str] = Header(None), db: Se
         db.add(ReflexAchievement(player_id=pid, code=f"title_equipped_{tid}"))
     db.commit()
     return {"ok": True, "active": tid or None}
+
+
+# ═══════════════════════════════════════════════════════════════
+#   ГЕМЫ 💎: премиум-валюта
+# ═══════════════════════════════════════════════════════════════
+
+GEM_SHOP = {
+    # gem_id → {name, price_gems, description, action}
+    "guaranteed_rare": {"name": "Гарантированный Rare+", "price": 100, "desc": "Открыть кейс с гарантией Rare или выше", "icon": "🎁"},
+    "case_bundle_3":   {"name": "3 кейса любой категории","price": 250, "desc": "3 обычных кейса на выбор", "icon": "📦"},
+    "bp_premium":      {"name": "Battle Pass Premium",     "price": 299, "desc": "Разблокировать премиум-трек Battle Pass", "icon": "⚔️"},
+    "double_xp_24h":   {"name": "×2 XP на 24 часа",         "price": 80,  "desc": "Удваивает XP за все матчи следующие 24 часа", "icon": "⚡"},
+    "coins_5000":      {"name": "5000 монет",               "price": 150, "desc": "Быстрый пакет монет", "icon": "💰"},
+}
+
+# Пакеты гемов за реальные деньги (Telegram Stars XTR: 1★ ≈ $0.013)
+GEM_PACKS = {
+    "gems_100":  {"gems": 100,  "price_stars": 70,   "price_rub": 99,    "name": "Малый сундук"},
+    "gems_500":  {"gems": 500,  "price_stars": 330,  "price_rub": 499,   "name": "Сундук", "bonus_pct": 10},
+    "gems_1200": {"gems": 1200, "price_stars": 650,  "price_rub": 999,   "name": "Большой сундук", "bonus_pct": 20},
+    "gems_3000": {"gems": 3000, "price_stars": 1500, "price_rub": 2299,  "name": "Сокровище", "bonus_pct": 25},
+}
+
+
+def _grant_gems(db: Session, player_id: int, amount: int, reason: str = ""):
+    """Выдать гемы + залогировать событие."""
+    if amount <= 0: return
+    me = db.query(Player).filter(Player.id == player_id).with_for_update().first()
+    if not me: return
+    me.gems = (me.gems or 0) + amount
+    try:
+        db.add(ReflexEvent(player_id=player_id, event_type="gems_granted",
+                           payload={"amount": amount, "reason": reason, "new_balance": me.gems}))
+    except Exception:
+        pass
+    db.commit()
+
+
+@router.get("/gems/shop")
+def gems_shop(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    return {
+        "spend_items": [
+            {"id": k, **v} for k, v in GEM_SHOP.items()
+        ],
+        "buy_packs": [
+            {"id": k, **v} for k, v in GEM_PACKS.items()
+        ],
+    }
+
+
+@router.post("/gems/spend")
+def gems_spend(data: dict, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"ok": False}
+    payload = verify_token(authorization[7:])
+    if not payload: return {"ok": False}
+    pid = payload.get("player_id")
+    item_id = (data or {}).get("item_id", "")
+    item = GEM_SHOP.get(item_id)
+    if not item: return {"ok": False, "msg": "Нет в магазине"}
+    me = db.query(Player).filter(Player.id == pid).with_for_update().first()
+    if not me: return {"ok": False}
+    if (me.gems or 0) < item["price"]:
+        return {"ok": False, "msg": f"Нужно {item['price']} 💎"}
+    me.gems -= item["price"]
+    awarded = {}
+    try:
+        if item_id == "coins_5000":
+            me.coins = (me.coins or 0) + 5000
+            awarded["coins"] = 5000
+        elif item_id == "bp_premium":
+            # Помечаем премиум для активного сезона
+            season = _ensure_active_season(db)
+            prog = db.query(ReflexPassProgress).filter(
+                ReflexPassProgress.player_id == pid,
+                ReflexPassProgress.season_id == season.id,
+            ).with_for_update().first()
+            if not prog:
+                prog = ReflexPassProgress(player_id=pid, season_id=season.id, xp=0, level=0, premium=True)
+                db.add(prog)
+            else:
+                prog.premium = True
+            awarded["bp_premium"] = True
+        elif item_id == "double_xp_24h":
+            # Помечаем флагом через ach code с TTL (используем дату окончания)
+            from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+            until = (_dt.now(_tz.utc) + _td(hours=24)).strftime("%Y-%m-%dT%H:%M")
+            db.add(ReflexAchievement(player_id=pid, code=f"booster_xp_until_{until}"))
+            awarded["xp_boost_until"] = until
+        elif item_id == "guaranteed_rare":
+            # Выдаём флаг на следующий open_case
+            db.add(ReflexAchievement(player_id=pid, code="booster_next_case_rare"))
+            awarded["next_case_rare"] = True
+        elif item_id == "case_bundle_3":
+            # Выдаём 3 "жетона" на бесплатное открытие
+            for i in range(3):
+                db.add(ReflexAchievement(player_id=pid, code=f"case_token_{i}_{_rnd.randint(1000, 99999)}"))
+            awarded["case_tokens"] = 3
+    except Exception as e:
+        print(f"[gems_spend] award error: {e}")
+    try:
+        db.add(ReflexEvent(player_id=pid, event_type="gems_spent",
+                           payload={"item_id": item_id, "gems": item["price"], "awarded": awarded}))
+    except Exception:
+        pass
+    db.commit()
+    return {"ok": True, "new_gems": me.gems, "new_coins": me.coins, "awarded": awarded}
+
+
+# ═══════════════════════════════════════════════════════════════
+#   TG STARS: создание invoice + webhook
+# ═══════════════════════════════════════════════════════════════
+
+import os as _os
+
+TG_BOT_TOKEN = _os.environ.get("TG_BOT_TOKEN", "")
+TG_STARS_ENABLED = bool(TG_BOT_TOKEN)
+
+
+@router.post("/payments/create_invoice")
+def create_invoice(data: dict, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    """Создаёт invoice через Telegram Bot API (или dev stub)."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"ok": False}
+    payload = verify_token(authorization[7:])
+    if not payload: return {"ok": False}
+    pid = payload.get("player_id")
+    pack_id = (data or {}).get("pack_id", "")
+    pack = GEM_PACKS.get(pack_id)
+    if not pack: return {"ok": False, "msg": "Нет такого пакета"}
+    # Создаём pending-payment в БД
+    pay = ReflexPayment(
+        player_id=pid,
+        provider="tg_stars" if TG_STARS_ENABLED else "dev",
+        product_id=pack_id,
+        amount_minor=pack["price_stars"],
+        currency="XTR",
+        status="pending",
+        gems_granted=0,
+    )
+    db.add(pay)
+    db.commit()
+    if not TG_STARS_ENABLED:
+        return {
+            "ok": True, "mode": "dev",
+            "payment_id": pay.id,
+            "msg": "Dev-режим: оплата через TG Stars не активна. Для активации задать TG_BOT_TOKEN.",
+        }
+    # В проде — бот создаёт invoice через createInvoiceLink
+    import urllib.request, urllib.parse, json as _json
+    title = pack["name"]
+    description = f"{pack['gems']} 💎 для Reflex Arena"
+    prices = [{"label": title, "amount": pack["price_stars"]}]
+    api_url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/createInvoiceLink"
+    body = urllib.parse.urlencode({
+        "title": title,
+        "description": description,
+        "payload": f"gems:{pay.id}:{pack_id}:{pid}",
+        "currency": "XTR",
+        "prices": _json.dumps(prices),
+    }).encode("utf-8")
+    try:
+        req = urllib.request.Request(api_url, data=body,
+            headers={"Content-Type": "application/x-www-form-urlencoded"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            ans = _json.loads(resp.read().decode("utf-8"))
+        if ans.get("ok") and ans.get("result"):
+            pay.external_id = ans["result"]
+            db.commit()
+            return {"ok": True, "mode": "tg_stars", "invoice_url": ans["result"], "payment_id": pay.id}
+    except Exception as e:
+        print(f"[tg stars invoice] {e}")
+    return {"ok": False, "msg": "Не удалось создать invoice"}
+
+
+@router.post("/payments/webhook/tg")
+def payments_webhook_tg(data: dict, db: Session = Depends(get_db)):
+    """Webhook от Telegram — successful_payment. Для prod."""
+    sp = (data or {}).get("successful_payment") or {}
+    if not sp:
+        return {"ok": True}
+    invoice_payload = sp.get("invoice_payload", "")
+    # Формат: gems:<payment_id>:<pack_id>:<player_id>
+    try:
+        parts = invoice_payload.split(":")
+        payment_id = int(parts[1]); pack_id = parts[2]; pid = int(parts[3])
+    except Exception:
+        return {"ok": False}
+    pay = db.query(ReflexPayment).filter(ReflexPayment.id == payment_id).with_for_update().first()
+    if not pay or pay.status == "completed":
+        return {"ok": True}
+    pack = GEM_PACKS.get(pack_id)
+    if not pack: return {"ok": False}
+    pay.status = "completed"
+    from datetime import datetime as _dt, timezone as _tz
+    pay.completed_at = _dt.now(_tz.utc)
+    pay.payload = sp
+    total_gems = pack["gems"] + int(pack["gems"] * (pack.get("bonus_pct", 0) / 100))
+    pay.gems_granted = total_gems
+    db.commit()
+    _grant_gems(db, pid, total_gems, reason=f"tg_stars_{pack_id}")
+    return {"ok": True}
+
+
+@router.post("/payments/dev_complete")
+def payments_dev_complete(data: dict, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    """DEV-режим: завершает платёж без реальной оплаты (для тестирования)."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"ok": False}
+    payload = verify_token(authorization[7:])
+    if not payload: return {"ok": False}
+    pid = payload.get("player_id")
+    if TG_STARS_ENABLED:
+        # В проде запрещаем
+        return {"ok": False, "msg": "Только dev-режим"}
+    payment_id = (data or {}).get("payment_id")
+    pay = db.query(ReflexPayment).filter(
+        ReflexPayment.id == payment_id,
+        ReflexPayment.player_id == pid,
+    ).with_for_update().first()
+    if not pay or pay.status == "completed":
+        return {"ok": False, "msg": "Платёж не найден или уже завершён"}
+    pack = GEM_PACKS.get(pay.product_id)
+    if not pack: return {"ok": False}
+    pay.status = "completed"
+    from datetime import datetime as _dt, timezone as _tz
+    pay.completed_at = _dt.now(_tz.utc)
+    total_gems = pack["gems"] + int(pack["gems"] * (pack.get("bonus_pct", 0) / 100))
+    pay.gems_granted = total_gems
+    db.commit()
+    _grant_gems(db, pid, total_gems, reason=f"dev_{pay.product_id}")
+    me = db.query(Player).filter(Player.id == pid).first()
+    return {"ok": True, "new_gems": me.gems if me else 0, "gems_granted": total_gems}
+
+
+# ═══════════════════════════════════════════════════════════════
+#   КЛУБЫ
+# ═══════════════════════════════════════════════════════════════
+
+CLUB_CREATE_PRICE_COINS = 2000
+CLUB_MAX_MEMBERS = 20
+
+
+@router.post("/clubs/create")
+def clubs_create(data: dict, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"ok": False}
+    payload = verify_token(authorization[7:])
+    if not payload: return {"ok": False}
+    pid = payload.get("player_id")
+    name = (data or {}).get("name", "").strip()
+    tag = (data or {}).get("tag", "").strip().upper()
+    desc = (data or {}).get("description", "").strip()[:200]
+    icon = (data or {}).get("icon", "🏰")
+    if not name or len(name) < 3 or len(name) > 30: return {"ok": False, "msg": "Имя 3-30 символов"}
+    if not tag or len(tag) < 2 or len(tag) > 5: return {"ok": False, "msg": "Тег 2-5 символов"}
+    me = db.query(Player).filter(Player.id == pid).with_for_update().first()
+    if not me: return {"ok": False}
+    if (me.coins or 0) < CLUB_CREATE_PRICE_COINS:
+        return {"ok": False, "msg": f"Нужно {CLUB_CREATE_PRICE_COINS} 💰"}
+    # Проверка членства
+    if db.query(ReflexClubMember).filter(ReflexClubMember.player_id == pid).first():
+        return {"ok": False, "msg": "Ты уже в клубе"}
+    # Уникальность
+    if db.query(ReflexClub).filter(ReflexClub.name == name).first():
+        return {"ok": False, "msg": "Имя занято"}
+    if db.query(ReflexClub).filter(ReflexClub.tag == tag).first():
+        return {"ok": False, "msg": "Тег занят"}
+    me.coins -= CLUB_CREATE_PRICE_COINS
+    club = ReflexClub(name=name, tag=tag, owner_id=pid, description=desc, icon=icon, member_count=1)
+    db.add(club); db.flush()
+    db.add(ReflexClubMember(club_id=club.id, player_id=pid, role="owner"))
+    db.commit()
+    return {"ok": True, "club": {"id": club.id, "name": name, "tag": tag, "icon": icon}, "new_coins": me.coins}
+
+
+@router.get("/clubs/list")
+def clubs_list(limit: int = Query(30, ge=1, le=100), db: Session = Depends(get_db)):
+    rows = db.query(ReflexClub).order_by(desc(ReflexClub.rating)).limit(limit).all()
+    return {
+        "clubs": [
+            {"id": c.id, "name": c.name, "tag": c.tag, "icon": c.icon,
+             "member_count": c.member_count or 0, "rating": round(c.rating or 0, 1),
+             "total_wins": c.total_wins or 0, "total_matches": c.total_matches or 0}
+            for c in rows
+        ],
+    }
+
+
+@router.get("/clubs/my")
+def clubs_my(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"authenticated": False}
+    payload = verify_token(authorization[7:])
+    if not payload: return {"authenticated": False}
+    pid = payload.get("player_id")
+    mem = db.query(ReflexClubMember).filter(ReflexClubMember.player_id == pid).first()
+    if not mem:
+        return {"authenticated": True, "in_club": False}
+    club = db.query(ReflexClub).filter(ReflexClub.id == mem.club_id).first()
+    if not club:
+        return {"authenticated": True, "in_club": False}
+    members = db.query(ReflexClubMember, Player).join(Player, Player.id == ReflexClubMember.player_id).filter(
+        ReflexClubMember.club_id == club.id
+    ).order_by(desc(ReflexClubMember.contribution)).limit(30).all()
+    return {
+        "authenticated": True,
+        "in_club": True,
+        "club": {
+            "id": club.id, "name": club.name, "tag": club.tag, "icon": club.icon,
+            "description": club.description or "",
+            "member_count": club.member_count or 0, "rating": round(club.rating or 0, 1),
+            "total_wins": club.total_wins or 0, "total_matches": club.total_matches or 0,
+            "owner_id": club.owner_id,
+        },
+        "my_role": mem.role,
+        "my_contribution": mem.contribution or 0,
+        "members": [
+            {"player_id": p.id, "nickname": p.nickname, "role": m.role,
+             "contribution": m.contribution or 0, "elo": round(p.reflex_elo or 1000, 0)}
+            for m, p in members
+        ],
+    }
+
+
+@router.post("/clubs/join")
+def clubs_join(data: dict, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"ok": False}
+    payload = verify_token(authorization[7:])
+    if not payload: return {"ok": False}
+    pid = payload.get("player_id")
+    club_id = (data or {}).get("club_id")
+    if not club_id: return {"ok": False}
+    if db.query(ReflexClubMember).filter(ReflexClubMember.player_id == pid).first():
+        return {"ok": False, "msg": "Ты уже в клубе"}
+    club = db.query(ReflexClub).filter(ReflexClub.id == club_id).with_for_update().first()
+    if not club: return {"ok": False, "msg": "Клуб не найден"}
+    if (club.member_count or 0) >= CLUB_MAX_MEMBERS:
+        return {"ok": False, "msg": "Клуб полон"}
+    db.add(ReflexClubMember(club_id=club.id, player_id=pid, role="member"))
+    club.member_count = (club.member_count or 0) + 1
+    db.commit()
+    return {"ok": True, "club_id": club.id}
+
+
+@router.post("/clubs/leave")
+def clubs_leave(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"ok": False}
+    payload = verify_token(authorization[7:])
+    if not payload: return {"ok": False}
+    pid = payload.get("player_id")
+    mem = db.query(ReflexClubMember).filter(ReflexClubMember.player_id == pid).first()
+    if not mem: return {"ok": False, "msg": "Ты не в клубе"}
+    club = db.query(ReflexClub).filter(ReflexClub.id == mem.club_id).with_for_update().first()
+    if club and club.owner_id == pid:
+        # Если владелец уходит — передаём старшему члену либо удаляем
+        other = db.query(ReflexClubMember).filter(
+            ReflexClubMember.club_id == club.id,
+            ReflexClubMember.player_id != pid,
+        ).order_by(desc(ReflexClubMember.contribution)).first()
+        if other:
+            club.owner_id = other.player_id
+            other.role = "owner"
+        else:
+            db.delete(club)
+    if club:
+        club.member_count = max(0, (club.member_count or 0) - 1)
+    db.delete(mem)
+    db.commit()
+    return {"ok": True}
+
+
+def _bump_club_stats(db: Session, player_id: int, is_win: bool):
+    """Обновляет статы клуба игрока при завершении матча."""
+    mem = db.query(ReflexClubMember).filter(ReflexClubMember.player_id == player_id).first()
+    if not mem: return
+    club = db.query(ReflexClub).filter(ReflexClub.id == mem.club_id).with_for_update().first()
+    if not club: return
+    club.total_matches = (club.total_matches or 0) + 1
+    if is_win:
+        club.total_wins = (club.total_wins or 0) + 1
+        mem.contribution = (mem.contribution or 0) + 3
+    else:
+        mem.contribution = (mem.contribution or 0) + 1
+    # Рейтинг: winrate * matches (нормализация)
+    if (club.total_matches or 0) > 0:
+        club.rating = round(((club.total_wins or 0) / club.total_matches) * 100 + (club.total_matches or 0) * 0.5, 2)
+
+
+# ═══════════════════════════════════════════════════════════════
+#   ТУРНИРЫ
+# ═══════════════════════════════════════════════════════════════
+
+TOURNAMENT_ENTRY_COINS = 100
+TOURNAMENT_PRIZES = {1: {"coins": 2000, "gems": 50}, 2: {"coins": 1000, "gems": 25}, 3: {"coins": 500, "gems": 10}}
+
+
+def _current_tournament_key() -> str:
+    from datetime import datetime as _dt, timezone as _tz
+    y, w, _ = _dt.now(_tz.utc).isocalendar()
+    return f"{y}-W{w:02d}"
+
+
+def _ensure_current_tournament(db: Session) -> ReflexTournament:
+    key = _current_tournament_key()
+    t = db.query(ReflexTournament).filter(ReflexTournament.week_key == key).first()
+    if not t:
+        t = ReflexTournament(week_key=key, status="open")
+        db.add(t); db.commit(); db.refresh(t)
+    return t
+
+
+@router.get("/tournament/current")
+def tournament_current(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    t = _ensure_current_tournament(db)
+    signups_count = db.query(ReflexTournamentSignup).filter(ReflexTournamentSignup.tournament_id == t.id).count()
+    my_signup = None
+    if authorization and authorization.startswith("Bearer "):
+        p = verify_token(authorization[7:])
+        if p:
+            pid = p.get("player_id")
+            ms = db.query(ReflexTournamentSignup).filter(
+                ReflexTournamentSignup.tournament_id == t.id,
+                ReflexTournamentSignup.player_id == pid,
+            ).first()
+            if ms:
+                my_signup = {"seed": ms.seed, "eliminated_at_round": ms.eliminated_at_round, "final_rank": ms.final_rank}
+    return {
+        "id": t.id,
+        "week_key": t.week_key,
+        "status": t.status,
+        "signups": signups_count,
+        "entry_coins": TOURNAMENT_ENTRY_COINS,
+        "prizes": TOURNAMENT_PRIZES,
+        "my_signup": my_signup,
+        "bracket": t.bracket,
+        "winner_id": t.winner_id,
+    }
+
+
+@router.post("/tournament/signup")
+def tournament_signup(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"ok": False}
+    payload = verify_token(authorization[7:])
+    if not payload: return {"ok": False}
+    pid = payload.get("player_id")
+    t = _ensure_current_tournament(db)
+    if t.status != "open":
+        return {"ok": False, "msg": "Регистрация закрыта"}
+    existing = db.query(ReflexTournamentSignup).filter(
+        ReflexTournamentSignup.tournament_id == t.id,
+        ReflexTournamentSignup.player_id == pid,
+    ).first()
+    if existing:
+        return {"ok": False, "msg": "Уже зарегистрирован"}
+    me = db.query(Player).filter(Player.id == pid).with_for_update().first()
+    if not me: return {"ok": False}
+    if (me.coins or 0) < TOURNAMENT_ENTRY_COINS:
+        return {"ok": False, "msg": f"Нужно {TOURNAMENT_ENTRY_COINS} 💰"}
+    me.coins -= TOURNAMENT_ENTRY_COINS
+    db.add(ReflexTournamentSignup(tournament_id=t.id, player_id=pid))
+    db.commit()
+    return {"ok": True, "new_coins": me.coins}
+
+
+@router.get("/tournament/leaderboard")
+def tournament_leaderboard(db: Session = Depends(get_db)):
+    t = _ensure_current_tournament(db)
+    rows = db.query(ReflexTournamentSignup, Player).join(Player, Player.id == ReflexTournamentSignup.player_id).filter(
+        ReflexTournamentSignup.tournament_id == t.id,
+    ).order_by(desc(Player.reflex_elo)).limit(50).all()
+    return {
+        "tournament_id": t.id,
+        "week_key": t.week_key,
+        "entries": [
+            {"rank": i + 1, "nickname": p.nickname, "elo": round(p.reflex_elo or 1000, 0),
+             "player_id": p.id, "final_rank": s.final_rank}
+            for i, (s, p) in enumerate(rows)
+        ],
+    }

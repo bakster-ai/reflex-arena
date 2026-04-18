@@ -84,6 +84,71 @@ def run_migrations():
                 created_at TIMESTAMPTZ DEFAULT NOW()
             )""",
             "CREATE INDEX IF NOT EXISTS idx_reflex_push_player ON reflex_push_subscriptions(player_id)",
+            # ── Премиум-валюта (гемы) ──
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS gems INTEGER DEFAULT 0",
+            # ── Клубы ──
+            """CREATE TABLE IF NOT EXISTS reflex_clubs (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR NOT NULL UNIQUE,
+                tag VARCHAR(5) NOT NULL UNIQUE,
+                owner_id INTEGER NOT NULL REFERENCES players(id),
+                description VARCHAR,
+                icon VARCHAR DEFAULT '🏰',
+                member_count INTEGER DEFAULT 1,
+                total_wins INTEGER DEFAULT 0,
+                total_matches INTEGER DEFAULT 0,
+                rating FLOAT DEFAULT 0,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )""",
+            """CREATE TABLE IF NOT EXISTS reflex_club_members (
+                id SERIAL PRIMARY KEY,
+                club_id INTEGER NOT NULL REFERENCES reflex_clubs(id),
+                player_id INTEGER NOT NULL REFERENCES players(id),
+                role VARCHAR DEFAULT 'member',
+                contribution INTEGER DEFAULT 0,
+                joined_at TIMESTAMPTZ DEFAULT NOW()
+            )""",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_reflex_club_member ON reflex_club_members(player_id)",
+            "CREATE INDEX IF NOT EXISTS idx_reflex_club_members_club ON reflex_club_members(club_id)",
+            "CREATE INDEX IF NOT EXISTS idx_reflex_clubs_rating ON reflex_clubs(rating DESC)",
+            # ── Турниры ──
+            """CREATE TABLE IF NOT EXISTS reflex_tournaments (
+                id SERIAL PRIMARY KEY,
+                week_key VARCHAR NOT NULL UNIQUE,
+                status VARCHAR DEFAULT 'open',
+                bracket JSON,
+                winner_id INTEGER REFERENCES players(id),
+                started_at TIMESTAMPTZ,
+                finished_at TIMESTAMPTZ,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )""",
+            """CREATE TABLE IF NOT EXISTS reflex_tournament_signups (
+                id SERIAL PRIMARY KEY,
+                tournament_id INTEGER NOT NULL REFERENCES reflex_tournaments(id),
+                player_id INTEGER NOT NULL REFERENCES players(id),
+                seed INTEGER,
+                eliminated_at_round INTEGER,
+                final_rank INTEGER,
+                joined_at TIMESTAMPTZ DEFAULT NOW()
+            )""",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_reflex_tourney_signup ON reflex_tournament_signups(tournament_id, player_id)",
+            # ── Payments (Telegram Stars / fallback) ──
+            """CREATE TABLE IF NOT EXISTS reflex_payments (
+                id SERIAL PRIMARY KEY,
+                player_id INTEGER REFERENCES players(id),
+                provider VARCHAR NOT NULL,
+                external_id VARCHAR,
+                product_id VARCHAR NOT NULL,
+                amount_minor INTEGER DEFAULT 0,
+                currency VARCHAR DEFAULT 'XTR',
+                status VARCHAR DEFAULT 'pending',
+                gems_granted INTEGER DEFAULT 0,
+                payload JSON,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                completed_at TIMESTAMPTZ
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_reflex_payments_player ON reflex_payments(player_id)",
+            "CREATE INDEX IF NOT EXISTS idx_reflex_payments_ext ON reflex_payments(external_id)",
         ]
         # Каждая миграция в своей транзакции — чтобы одна битая не аборнула остальные
         for sql in migrations:

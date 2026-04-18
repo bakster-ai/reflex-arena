@@ -12,6 +12,7 @@ class Player(Base):
     nickname    = Column(String, nullable=False, unique=True)
     xp          = Column(Integer, default=0)
     coins       = Column(Integer, default=0)
+    gems        = Column(Integer, default=0)  # премиум-валюта
 
     # Общий ELO Reflex Arena
     reflex_elo  = Column(Float, default=1000.0)
@@ -134,6 +135,75 @@ class ReflexPushSubscription(Base):
     endpoint    = Column(String, nullable=False, unique=True)
     keys_json   = Column(JSON, nullable=False)  # {auth, p256dh}
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ReflexClub(Base):
+    __tablename__ = "reflex_clubs"
+
+    id             = Column(Integer, primary_key=True, index=True)
+    name           = Column(String, nullable=False, unique=True)
+    tag            = Column(String(5), nullable=False, unique=True)
+    owner_id       = Column(Integer, ForeignKey("players.id"), nullable=False)
+    description    = Column(String, nullable=True)
+    icon           = Column(String, default="🏰")
+    member_count   = Column(Integer, default=1)
+    total_wins     = Column(Integer, default=0)
+    total_matches  = Column(Integer, default=0)
+    rating         = Column(Float, default=0.0)
+    created_at     = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ReflexClubMember(Base):
+    __tablename__ = "reflex_club_members"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    club_id       = Column(Integer, ForeignKey("reflex_clubs.id"), nullable=False, index=True)
+    player_id     = Column(Integer, ForeignKey("players.id"), nullable=False, unique=True, index=True)
+    role          = Column(String, default="member")
+    contribution  = Column(Integer, default=0)
+    joined_at     = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ReflexTournament(Base):
+    __tablename__ = "reflex_tournaments"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    week_key    = Column(String, nullable=False, unique=True)
+    status      = Column(String, default="open")
+    bracket     = Column(JSON, nullable=True)
+    winner_id   = Column(Integer, ForeignKey("players.id"), nullable=True)
+    started_at  = Column(DateTime(timezone=True), nullable=True)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    created_at  = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ReflexTournamentSignup(Base):
+    __tablename__ = "reflex_tournament_signups"
+
+    id                   = Column(Integer, primary_key=True, index=True)
+    tournament_id        = Column(Integer, ForeignKey("reflex_tournaments.id"), nullable=False, index=True)
+    player_id            = Column(Integer, ForeignKey("players.id"), nullable=False, index=True)
+    seed                 = Column(Integer, nullable=True)
+    eliminated_at_round  = Column(Integer, nullable=True)
+    final_rank           = Column(Integer, nullable=True)
+    joined_at            = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ReflexPayment(Base):
+    __tablename__ = "reflex_payments"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    player_id     = Column(Integer, ForeignKey("players.id"), nullable=True, index=True)
+    provider      = Column(String, nullable=False)  # 'tg_stars', 'yookassa', 'dev'
+    external_id   = Column(String, nullable=True, index=True)
+    product_id    = Column(String, nullable=False)
+    amount_minor  = Column(Integer, default=0)  # minor units (копейки/stars)
+    currency      = Column(String, default="XTR")  # XTR = Telegram Stars
+    status        = Column(String, default="pending")  # pending/completed/failed
+    gems_granted  = Column(Integer, default=0)
+    payload       = Column(JSON, nullable=True)
+    created_at    = Column(DateTime(timezone=True), server_default=func.now())
+    completed_at  = Column(DateTime(timezone=True), nullable=True)
 
 
 class ReflexFriend(Base):
