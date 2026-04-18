@@ -1725,8 +1725,208 @@
     }
 
     /* ═══════════════════════════════════════════════════════════════
-       ВАУ-ПРОХОД: радикальный редизайн home + floating elements
+       ВАУ-ПРОХОД 2: тотальный редизайн home — большие SVG, neon grid, stats
        ═══════════════════════════════════════════════════════════════ */
+
+    /* Neon grid — сетка перспективой на фоне */
+    body:not([data-style]) #grid-bg {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      opacity: 0.15;
+      background-image:
+        linear-gradient(rgba(255,122,41,0.5) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,61,127,0.3) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse at center, #000 0%, transparent 75%);
+      -webkit-mask-image: radial-gradient(ellipse at center, #000 0%, transparent 75%);
+      animation: gridMove 30s linear infinite;
+    }
+    @keyframes gridMove {
+      0%   { background-position: 0 0, 0 0; }
+      100% { background-position: 48px 48px, 48px 48px; }
+    }
+
+    /* Большой переработанный home-card */
+    body:not([data-style]) .hv2-card {
+      position: relative; overflow: hidden;
+      border-radius: 24px;
+      padding: 24px;
+      cursor: pointer;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s;
+      display: flex; flex-direction: column; gap: 12px;
+      min-height: 150px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: linear-gradient(155deg, rgba(30,34,52,0.95), rgba(18,22,36,0.95));
+    }
+    body:not([data-style]) .hv2-card:hover { transform: translateY(-6px) scale(1.02); }
+    body:not([data-style]) .hv2-card:active { transform: scale(0.97); }
+
+    /* Блик */
+    body:not([data-style]) .hv2-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    }
+    /* Фоновый blob в углу каждой карточки */
+    body:not([data-style]) .hv2-card::after {
+      content: ''; position: absolute;
+      bottom: -50%; right: -20%;
+      width: 80%; aspect-ratio: 1;
+      background: radial-gradient(circle, var(--card-accent, #ff7a29), transparent 65%);
+      filter: blur(40px); opacity: 0.35;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    body:not([data-style]) .hv2-card:hover::after { opacity: 0.55; }
+
+    /* Primary Play-карточка — гигантская */
+    body:not([data-style]) .hv2-play {
+      grid-column: 1 / -1;
+      min-height: 200px;
+      padding: 28px;
+      background: linear-gradient(135deg, #ff6a00 0%, #ff3d7f 50%, #a855f7 100%) !important;
+      border: none !important;
+      box-shadow:
+        0 20px 60px rgba(255,61,127,0.35),
+        inset 0 1px 0 rgba(255,255,255,0.25),
+        inset 0 -20px 40px rgba(0,0,0,0.18);
+      overflow: hidden;
+    }
+    body:not([data-style]) .hv2-play::after {
+      background: radial-gradient(circle, rgba(255,255,255,0.4), transparent 60%);
+      opacity: 0.8;
+      animation: primaryPulse 3s ease-in-out infinite alternate;
+      right: -10%; bottom: -10%;
+    }
+    body:not([data-style]) .hv2-play .hv2-title {
+      font-size: 34px !important; font-weight: 900 !important;
+      letter-spacing: -1px !important; color: #fff !important;
+      text-shadow: 0 4px 18px rgba(0,0,0,0.35);
+    }
+    body:not([data-style]) .hv2-play .hv2-desc {
+      color: rgba(255,255,255,0.95) !important;
+      font-size: 14px !important; font-weight: 500 !important;
+    }
+    body:not([data-style]) .hv2-play .hv2-cta {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: auto;
+      background: rgba(0,0,0,0.25);
+      backdrop-filter: blur(8px);
+      padding: 10px 18px;
+      border-radius: 30px;
+      font-family: var(--font-display);
+      font-weight: 700; font-size: 14px;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.2);
+      align-self: flex-start;
+    }
+
+    /* Content внутри hv2-card */
+    body:not([data-style]) .hv2-card .hv2-icon {
+      width: 56px; height: 56px;
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    body:not([data-style]) .hv2-card .hv2-icon svg { width: 32px; height: 32px; }
+    body:not([data-style]) .hv2-card.hv2-play .hv2-icon {
+      width: 72px; height: 72px; border-radius: 20px;
+      background: rgba(255,255,255,0.15);
+      border-color: rgba(255,255,255,0.25);
+    }
+    body:not([data-style]) .hv2-card.hv2-play .hv2-icon svg { width: 44px; height: 44px; }
+    body:not([data-style]) .hv2-card .hv2-title {
+      font-family: var(--font-display);
+      font-weight: 800; font-size: 22px;
+      letter-spacing: -0.4px; color: var(--text-overhaul);
+    }
+    body:not([data-style]) .hv2-card .hv2-desc {
+      font-size: 12px; color: var(--muted-overhaul);
+    }
+
+    /* Bento-грид */
+    body:not([data-style]) .hv2-grid {
+      max-width: 640px; margin: 0 auto;
+      display: grid; gap: 14px;
+      grid-template-columns: 1fr 1fr;
+      padding: 0 14px;
+      position: relative; z-index: 2;
+    }
+
+    /* Stats-row — счётчики */
+    body:not([data-style]) .hv2-stats {
+      max-width: 640px; margin: 0 auto 14px;
+      padding: 0 14px;
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      position: relative; z-index: 2;
+    }
+    body:not([data-style]) .hv2-stat {
+      background: linear-gradient(155deg, rgba(255,255,255,0.04), rgba(0,0,0,0.2));
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 12px;
+      text-align: center;
+      position: relative; overflow: hidden;
+    }
+    body:not([data-style]) .hv2-stat-v {
+      font-family: var(--font-display);
+      font-size: 24px; font-weight: 800;
+      background: var(--grad-primary);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
+      line-height: 1;
+    }
+    body:not([data-style]) .hv2-stat-l {
+      font-size: 10px; color: var(--muted-overhaul);
+      text-transform: uppercase; letter-spacing: 0.8px;
+      margin-top: 4px; font-weight: 600;
+    }
+
+    /* Обновлённый Hero — крупнее */
+    body:not([data-style]) .home-hero {
+      padding: 36px 20px 20px !important;
+      text-align: center;
+      position: relative; z-index: 2;
+    }
+    body:not([data-style]) .home-hero h1 {
+      font-size: 52px !important;
+      font-weight: 900 !important;
+      letter-spacing: -2px !important;
+      margin: 0 0 6px !important;
+      background: linear-gradient(135deg, #fff 0%, #ffb86b 25%, #ff3d7f 50%, #a855f7 75%, #06e7ff 100%) !important;
+      background-size: 200% 100% !important;
+      -webkit-background-clip: text !important; background-clip: text !important;
+      -webkit-text-fill-color: transparent !important; color: transparent !important;
+      animation: heroGradient 6s ease-in-out infinite alternate !important;
+      filter: drop-shadow(0 8px 24px rgba(255,61,127,0.3));
+    }
+    body:not([data-style]) .home-hero .sub {
+      color: var(--muted-overhaul) !important;
+      font-size: 12px !important;
+      letter-spacing: 2px !important;
+      text-transform: uppercase;
+      font-weight: 600 !important;
+    }
+    @media (max-width: 480px) {
+      body:not([data-style]) .home-hero h1 { font-size: 40px !important; }
+    }
+
+    /* Neon chips в топбаре */
+    body:not([data-style]) .chip.coins {
+      background: linear-gradient(135deg, rgba(251,191,36,0.15), rgba(249,115,22,0.1)) !important;
+      border: 1px solid rgba(251,191,36,0.3) !important;
+      color: #fbbf24 !important;
+      box-shadow: 0 0 12px rgba(251,191,36,0.15);
+    }
+    body:not([data-style]) #top-gems-chip {
+      background: linear-gradient(135deg, rgba(168,85,247,0.18), rgba(236,72,153,0.1)) !important;
+      border: 1px solid rgba(168,85,247,0.35) !important;
+      color: #c7b2ff !important;
+      box-shadow: 0 0 12px rgba(168,85,247,0.2);
+    }
+
+  </style>
 
     /* Floating decorative orbs — слой поверх фона, но под контентом */
     body:not([data-style]) #deco-layer {
@@ -2040,7 +2240,9 @@
   </style>
 </head>
 <body><!--STYLE-PLACEHOLDER-->
-<!-- Floating decorative orbs (деко-слой) -->
+<!-- Grid-перспектива на фоне -->
+<div id="grid-bg"></div>
+<!-- Floating decorative orbs -->
 <div id="deco-layer">
   <div class="orb orb-1"></div>
   <div class="orb orb-2"></div>
@@ -2134,7 +2336,11 @@
         </div>
       </div>
 
-      <div class="home-grid">
+      <div id="hv2-stats-row" class="hv2-stats"></div>
+
+      <div class="hv2-grid" id="hv2-grid"></div>
+      <!-- Fallback старый грид (показываем если hv2 не загрузился / в темах) -->
+      <div class="home-grid" id="legacy-home-grid" style="display:none;">
         <div class="home-card primary" onclick="switchTab('play')">
           <div class="ic">🎮</div>
           <div class="t">Играть</div>
@@ -2683,6 +2889,8 @@ function switchTab(tab, opts = {}) {
     loadClubs(); loadTournament(); loadClubChat(); startClubChatPolling();
   }
   if (tab === 'home') {
+    renderHomeBento();
+    renderHomeStats();
     renderTierBanner();
     loadBattlePass(); loadDailyChallenge(); loadStreak(); loadActivityFeed(); loadWeeklyEvent(); loadBoostInfo();
     loadSeasonalEvent(); loadAdsStatus(); loadPlacementInfo();
@@ -4888,6 +5096,119 @@ async function claimStreak() {
   } else {
     alert(r.msg || 'Ошибка');
   }
+}
+
+// ─── Home bento-grid с inline SVG ───
+function renderHomeBento() {
+  const grid = document.getElementById('hv2-grid');
+  if (!grid) return;
+  const fallback = document.getElementById('legacy-home-grid');
+  if (document.body.dataset.style) {
+    // В теме — используем старый грид
+    if (fallback) fallback.style.display = '';
+    grid.style.display = 'none';
+    return;
+  }
+  if (fallback) fallback.style.display = 'none';
+  grid.style.display = 'grid';
+  grid.innerHTML = `
+    <div class="hv2-card hv2-play" onclick="switchTab('play')" style="--card-accent:#ff3d7f;">
+      <div class="hv2-icon">
+        <svg viewBox="0 0 64 64" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 30c0-6 5-11 11-11h26c6 0 11 5 11 11v5c0 5-4 9-9 9-3 0-5-1-7-4l-2-3H30l-2 3c-2 3-4 4-7 4-5 0-9-4-9-9v-5z" fill="rgba(255,255,255,0.15)"/>
+          <line x1="22" y1="27" x2="22" y2="33"/>
+          <line x1="19" y1="30" x2="25" y2="30"/>
+          <circle cx="42" cy="28" r="2" fill="white"/>
+          <circle cx="47" cy="32" r="2" fill="white"/>
+        </svg>
+      </div>
+      <div style="display:flex;flex-direction:column;flex:1;">
+        <div class="hv2-title">Играть</div>
+        <div class="hv2-desc">Матчмейкинг · Бот · С другом</div>
+      </div>
+      <div class="hv2-cta">⚡ Начать матч →</div>
+    </div>
+
+    <div class="hv2-card" onclick="switchTab('profile')" style="--card-accent:#06e7ff;">
+      <div class="hv2-icon" style="background:linear-gradient(135deg,rgba(6,231,255,0.2),rgba(59,130,246,0.1));border-color:rgba(6,231,255,0.3);">
+        <svg viewBox="0 0 32 32" fill="none">
+          <defs><linearGradient id="hv2g-prof" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#06e7ff"/><stop offset="1" stop-color="#3b82f6"/></linearGradient></defs>
+          <circle cx="16" cy="11" r="5" fill="url(#hv2g-prof)"/>
+          <path fill="url(#hv2g-prof)" d="M16 18c-5 0-9 2.5-9 7v2h18v-2c0-4.5-4-7-9-7z"/>
+        </svg>
+      </div>
+      <div class="hv2-title">Профиль</div>
+      <div class="hv2-desc">Статистика · Коллекция · Титулы</div>
+    </div>
+
+    <div class="hv2-card" onclick="switchTab('shop')" style="--card-accent:#a855f7;">
+      <div class="hv2-icon" style="background:linear-gradient(135deg,rgba(168,85,247,0.22),rgba(236,72,153,0.12));border-color:rgba(168,85,247,0.35);">
+        <svg viewBox="0 0 32 32" fill="none">
+          <defs><linearGradient id="hv2g-shop" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a855f7"/><stop offset="1" stop-color="#ec4899"/></linearGradient></defs>
+          <path fill="url(#hv2g-shop)" d="M7 10h18l-1.5 14c-.2 1.2-1.2 2-2.4 2H10.9c-1.2 0-2.2-0.8-2.4-2L7 10z"/>
+          <path fill="url(#hv2g-shop)" opacity="0.75" d="M11 10V8a5 5 0 0110 0v2h-2V8a3 3 0 00-6 0v2h-2z"/>
+          <circle cx="13" cy="17" r="1.5" fill="white" opacity="0.9"/>
+          <circle cx="19" cy="17" r="1.5" fill="white" opacity="0.9"/>
+        </svg>
+      </div>
+      <div class="hv2-title">Магазин</div>
+      <div class="hv2-desc">💎 Гемы · Кейсы · Темы · Аватары</div>
+    </div>
+
+    <div class="hv2-card" onclick="switchTab('lb')" style="--card-accent:#fbbf24;">
+      <div class="hv2-icon" style="background:linear-gradient(135deg,rgba(251,191,36,0.22),rgba(249,115,22,0.12));border-color:rgba(251,191,36,0.35);">
+        <svg viewBox="0 0 32 32" fill="none">
+          <defs><linearGradient id="hv2g-trophy" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbbf24"/><stop offset="1" stop-color="#f97316"/></linearGradient></defs>
+          <path fill="url(#hv2g-trophy)" d="M11 4h10v5c0 3.5-2.2 6.5-5 7v4h3v2h-6v-2h3v-4c-2.8-0.5-5-3.5-5-7V4z"/>
+          <path fill="url(#hv2g-trophy)" opacity="0.7" d="M7 6h3v3c0 1 0.2 2 0.5 2.8-2-0.6-3.5-2.3-3.5-4.3V6zm18 0h-3v3c0 1-0.2 2-0.5 2.8 2-0.6 3.5-2.3 3.5-4.3V6z"/>
+          <rect x="10" y="23" width="12" height="3" rx="0.5" fill="url(#hv2g-trophy)"/>
+        </svg>
+      </div>
+      <div class="hv2-title">Топ</div>
+      <div class="hv2-desc">🏅 Лидерборд · Клубы · Турниры</div>
+    </div>
+
+    <div class="hv2-card" onclick="findMatch()" style="--card-accent:#26d67f;grid-column:1 / -1;">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <div class="hv2-icon" style="background:linear-gradient(135deg,rgba(38,214,127,0.25),rgba(16,185,129,0.12));border-color:rgba(38,214,127,0.4);">
+          <svg viewBox="0 0 32 32" fill="none" stroke="#26d67f" stroke-width="2.5" stroke-linecap="round">
+            <path d="M6 16c0-5.5 4.5-10 10-10s10 4.5 10 10-4.5 10-10 10c-3 0-5.6-1.3-7.5-3.4" />
+            <path d="M10 22l-4 0.5 0.5-4" />
+            <path d="M16 11v5l4 2" />
+          </svg>
+        </div>
+        <div style="flex:1;">
+          <div class="hv2-title">Быстрый матч</div>
+          <div class="hv2-desc">Нажми — найдём соперника за секунды</div>
+        </div>
+        <div style="font-size:22px;color:#26d67f;">→</div>
+      </div>
+    </div>
+  `;
+}
+
+// Stats-row — мини-статистика: матчи сегодня, ELO сегодня, стрик
+function renderHomeStats() {
+  const el = document.getElementById('hv2-stats-row');
+  if (!el || !ME) return;
+  if (document.body.dataset.style) { el.style.display = 'none'; return; }
+  el.style.display = 'grid';
+  const wins = ME.wins || 0, losses = ME.losses || 0, total = wins + losses;
+  const wr = total > 0 ? Math.round((wins * 100) / total) : 0;
+  el.innerHTML = `
+    <div class="hv2-stat">
+      <div class="hv2-stat-v">${total}</div>
+      <div class="hv2-stat-l">Всего матчей</div>
+    </div>
+    <div class="hv2-stat">
+      <div class="hv2-stat-v">${wr}%</div>
+      <div class="hv2-stat-l">Winrate</div>
+    </div>
+    <div class="hv2-stat">
+      <div class="hv2-stat-v">${Math.round(ME.elo || 1000)}</div>
+      <div class="hv2-stat-l">Твой ELO</div>
+    </div>
+  `;
 }
 
 // ─── Tier banner на home ───
